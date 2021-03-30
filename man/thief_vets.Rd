@@ -47,7 +47,8 @@ c("none", "common", "diagonal", "full", "grouped")}
 \item{seasonal}{\code{character}. The dynamics for the seasonal component in the \code{tsvets} model. Options are:
 c("none", "common", "diagonal", "full", "grouped")}
 
-\item{lambda}{The Box Cox power transformation vector (see \code{\link[tsaux]{box_cox}})}
+\item{lambda}{\code{numeric proportional}. The Box Cox power transformation parameter for all series. Must be
+between \code{0} and \code{1} inclusive}
 
 \item{dependence}{\code{character}. The multivariate error dependence structure to impose. Options are:
 c("diagonal", "full", "equicorrelation", "shrinkage")}
@@ -140,7 +141,11 @@ cores = parallel::detectCores() - 1,
 group = ixodes_vets_dat$groups,
 save_plots = F)
 
-calc_crps(simulation = mod2, y_test = ixodes_vets_dat$y_test)}
+calc_crps(simulation = mod2, y_test = ixodes_vets_dat$y_test)
+
+# Plot one of the forecasts against the true values in the test set
+plot_vets_preds(simulation = mod2[[4]])
+points(as.vector(ixodes_vets_dat$y_test[,4]))}
 
 }
 \references{

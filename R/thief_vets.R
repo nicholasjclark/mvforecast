@@ -30,7 +30,8 @@
 #'possible to have group wise pooling. For instance 2 variables sharing one pooled estimates,
 #'and 3 other variables sharing another grouped estimate would have values of (2,2,3,3,3).
 #'The index for group wise pooling starts at 2 and should be incremented for each new group added. Defaults to \code{NULL}
-#'@param lambda The Box Cox power transformation vector (see \code{\link[tsaux]{box_cox}})
+#'@param lambda \code{numeric proportional}. The Box Cox power transformation parameter for all series. Must be
+#'between \code{0} and \code{1} inclusive
 #'@param frequency \code{integer}. The seasonal frequency in \code{y}
 #'@param horizon \code{integer}. The horizon to forecast. Defaults to \code{frequency}
 #'@param dependence \code{character}. The multivariate error dependence structure to impose. Options are:
@@ -106,7 +107,11 @@
 #' group = ixodes_vets_dat$groups,
 #' save_plots = F)
 #'
-#' calc_crps(simulation = mod2, y_test = ixodes_vets_dat$y_test)}
+#' calc_crps(simulation = mod2, y_test = ixodes_vets_dat$y_test)
+#'
+#' # Plot one of the forecasts against the true values in the test set
+#' plot_vets_preds(simulation = mod2[[4]])
+#' points(as.vector(ixodes_vets_dat$y_test[,4]))}
 #'
 #'@export
 #'
@@ -135,12 +140,38 @@ thief_vets = function(y,
   }
 
   n <- NCOL(y)
-  if (n == 1) stop("\ncannot specify a vector model with only one series")
+  if (n == 1){
+    stop("\ncannot specify a vector ets model with only one series")
+  }
 
   ynames <- colnames(y)
   if(is.null(ynames)) {
     colnames(y) <- paste0("Series", 1:n)
     ynames <- colnames(y)
+  }
+
+  level <- match.arg(arg = level[1],
+                     choices = c("constant", "diagonal", "common", "full", "grouped"))
+  slope <- match.arg(arg = slope[1],
+                     choices = c("none", "constant", "common", "diagonal", "full", "grouped"))
+  damped <- match.arg(arg = damped[1],
+                      choices = c("none", "common", "diagonal", "full", "grouped"))
+  seasonal <- match.arg(arg = seasonal[1],
+                        choices = c("none", "common", "diagonal", "full", "grouped"))
+  dependence <- match.arg(arg = dependence[1],
+                          choices = c("diagonal", "full", "equicorrelation", "grouped_equicorrelation", "shrinkage"))
+
+  if (any(c(level, slope, damped, seasonal) %in% "grouped")) {
+    if (is.null(group)) stop("\ngroup cannot be NULL for grouped choice")
+    if (length(group) != n) stop("\nlength of group vector must be equal to number of cols of y")
+    if (max(group) > n) stop("\nmax group > ncol y...check and resubmit")
+    if (all(group == max(group))) stop("\ngroup variable is the same for all y. Try common instead")
+  } else {
+    group <- NULL
+  }
+
+  if(!is.null(lambda)){
+    if(lambda < 0 || lambda > 1) stop('lambda must be between 0 and 1 inclusive')
   }
 
   # Set forecast horizon if missing
