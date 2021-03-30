@@ -129,6 +129,19 @@ thief_vets = function(y,
                       save_plots = TRUE,
                       fig_path = ''){
 
+  # Check variables
+  if (!xts::is.xts(y)) {
+    stop("y must be an xts object")
+  }
+
+  n <- NCOL(y)
+  if (n == 1) stop("\ncannot specify a vector model with only one series")
+
+  ynames <- colnames(y)
+  if(is.null(ynames)) {
+    colnames(y) <- paste0("Series", 1:n)
+    ynames <- colnames(y)
+  }
 
   # Set forecast horizon if missing
   if(missing(horizon)){
@@ -246,7 +259,7 @@ thief_vets = function(y,
       # If xreg supplied and frequency is large enough, fit a VETS model
       if(!is.null(xreg)){
         cat('\nFitting a vets model with regressors to series with frequency', frequencies[i],'\n')
-        full_mod <- suppressWarnings(tsvets::estimate(tsvets::vets_modelspec(outcomes[[i]],
+        full_mod <- suppressWarnings(tsvets:::estimate.tsvets.spec(tsvets:::vets_modelspec(outcomes[[i]],
                                                              level = level,
                                                              slope = slope,
                                                              damped = damped,
@@ -277,10 +290,10 @@ thief_vets = function(y,
         }
 
         # Generate predictions using supplied future regressors
-        p <- tsvets::predict.tsvets.estimate(full_mod, h = frequencies[i] * k, newxreg = newxreg_outcomes[[i]])
+        p <- tsvets:::predict.tsvets.estimate(full_mod, h = frequencies[i] * k, newxreg = newxreg_outcomes[[i]])
 
         # If future regressors are not long enough for a forecast of length frequency * k, lengthen the forecast
-        p_null <- suppressWarnings(tsvets::predict.tsvets.estimate(full_mod, h = frequencies[i] * k,
+        p_null <- suppressWarnings(tsvets:::predict.tsvets.estimate(full_mod, h = frequencies[i] * k,
                                            forc_dates = seq.POSIXt(as.POSIXct(end(outcomes[[i]])),
                                                                    length.out = frequencies[i] + 1,
                                                                    by = frequencies[i])[2:(frequencies[i]+1)]))
@@ -337,7 +350,7 @@ thief_vets = function(y,
       } else {
         # If no xreg is supplied, fit a VETS model without regressors
         cat('\nFitting a vets model with no regressors to series with frequency', frequencies[i],'\n')
-        full_mod <- suppressWarnings(estimate(vets_modelspec(outcomes[[i]],
+        full_mod <- suppressWarnings(tsvets:::estimate.tsvets.spec(tsvets:::vets_modelspec(outcomes[[i]],
                                                              level = level,
                                                              slope = slope,
                                                              damped = damped,
@@ -365,7 +378,7 @@ thief_vets = function(y,
         }
 
         # Generate forecasts and summarise into forecast objects
-        p_null <- suppressWarnings(predict(full_mod, h = frequencies[i] * k,
+        p_null <- suppressWarnings(tsvets:::predict.tsvets.estimate(full_mod, h = frequencies[i] * k,
                                            forc_dates = seq.POSIXt(as.POSIXct(end(outcomes[[i]])),
                                                                    length.out = frequencies[i] + 1,
                                                                    by = frequencies[i])[2:(frequencies[i]+1)]))
