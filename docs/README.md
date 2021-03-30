@@ -13,7 +13,7 @@ install.packages("devtools")
 devtools::install_github("nicholasjclark/mvforecast")
 ```
 
-You can test the package's main functionality with the `test_mvforecast` function, which fits a multivariate exponential smoothing model to the NEON *Ixodes scapularis* survey timeseries that are used in the [Ecological Forecasting Initiative's 2021 Forecast Challenge](https://ecoforecast.org/efi-rcn-forecast-challenges/). Using `thief_vets`, the function then fits automatic univariate foirecast models to all higher levels of temporal aggregation before reconciling them using functions available in the [`thief` package](http://pkg.robjhyndman.com/thief/)
+You can test the package's main functionality with the `test_mvforecast` function, which fits a multivariate exponential smoothing model to the NEON *Ixodes scapularis* survey timeseries that are used in the [Ecological Forecasting Initiative's 2021 Forecast Challenge](https://ecoforecast.org/efi-rcn-forecast-challenges/). Using `thief_vets`, the function then fits an equivalent model to the original series but also uses automatic univariate forecast models applied to all higher levels of temporal aggregation to gain information about long-term trends and seasonalities that would otherwise be missed when focusing only on the noisy original data. `thief_vets` uses these aggregate forecasts to reconcile the original forecast by relying on functions available in the [`thief` package](http://pkg.robjhyndman.com/thief/). Finally, the sum of the Continuous Rank Probability Score is calculated for both models against the out-of-sample test set, where a lower score is better.
 
 ``` r
 library(mvforecast)
@@ -55,10 +55,10 @@ test_mvforecast()
     #> 
     #> Calculating CRPS against ixodes_vets_dat$ytest for both models (lower is better)
     #>                     Min. X1st.Qu.   Median      Mean  X3rd.Qu.     Max.
-    #> vets_crps       21.81187 77.25297 96.05023 125.73973 141.01221 271.6396
-    #> thief_vets_crps 11.81485 36.52212 42.65966  62.93796  56.94122 185.2243
+    #> vets_crps       21.91860 75.72644 97.43491 126.76146 138.28676 282.8868
+    #> thief_vets_crps 11.86312 35.81196 43.25483  62.41912  57.11869 185.4471
 
-A `Docker` container has been built to ensure functions in this package can be used in future if dependencies make any drastic changes. You can install the container from `Dockerhub`. For example, using `singularity` this would read as:
+Reconciliation is clearly a powerful technique that can drastically improve forecasts for many types of time series. In the interest of transparency and robust software engineering, a `Docker` container has been built to ensure functions in this package can be used in future if dependencies make any drastic changes. You can install the container from `Dockerhub`. For example, using `singularity` this would read as:
 
 ``` r
 singularity pull docker://nicholasjclark/brms
