@@ -2,7 +2,7 @@
 % Please edit documentation in R/calc_crps.R
 \name{calc_crps}
 \alias{calc_crps}
-\title{calculate continuous rank probability score from a VETS model forecast distribution}
+\title{Calculate continuous rank probability score from a VETS model forecast distribution}
 \usage{
 calc_crps(simulation, y_test)
 }
@@ -16,7 +16,7 @@ calc_crps(simulation, y_test)
 a \code{summary} of the out-of-sample CRPS
 }
 \description{
-calculate continuous rank probability score from a VETS model forecast distribution
+Calculate continuous rank probability score from a VETS model forecast distribution
 }
 \details{
 The sum of the CRPS is calculated against the test observations in \code{y_test} and returned. Calculations

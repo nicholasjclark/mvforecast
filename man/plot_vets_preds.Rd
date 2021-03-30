@@ -15,7 +15,7 @@ similar to those returned by \code{\link{thief_vets}}}
 \item{ylab}{\code{character}. Optional label for the y axis}
 }
 \value{
-A base plot of the forecast mean (black line) and 95% prediction intervals (red dashed lines)
+A base plot of the forecast mean (black line) and 95 percent prediction intervals (red dashed lines)
 }
 \description{
 Plot simulation predictions from a reconciled VETS model

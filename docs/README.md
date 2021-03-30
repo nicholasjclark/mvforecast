@@ -13,6 +13,47 @@ install.packages("devtools")
 devtools::install_github("nicholasjclark/mvforecast")
 ```
 
+You can test the package's main functionality with the `test_mvforecast` function, which fits a multivariate exponential smoothing model to the NEON *Ixodes scapularis* survey timeseries that are used in the [Ecological Forecasting Initiative's 2021 Forecast Challenge](https://ecoforecast.org/efi-rcn-forecast-challenges/). Using `thief_vets`, the function then fits automatic univariate foirecast models to all higher levels of temporal aggregation before reconciling them using functions available in the [`thief` package](http://pkg.robjhyndman.com/thief/)
+
+``` r
+library(mvforecast)
+#> Loading required package: forecast
+#> Registered S3 method overwritten by 'quantmod':
+#>   method            from
+#>   as.zoo.data.frame zoo
+test_mvforecast()
+#> Loading the ixodes_vets_dat dataset
+#> 
+#> 
+#> Fitting a vets model with no regressors to series with frequency 52
+#> Registered S3 method overwritten by 'GGally':
+#>   method from   
+#>   +.gg   ggplot2
+#> sROC 0.1-2 loaded
+#> 
+#> Fitting automatic forecast to series at frequency 26 
+#> 
+#> Fitting automatic forecast to series at frequency 13 
+#> 
+#> Fitting automatic forecast to series at frequency 4 
+#> 
+#> Fitting automatic forecast to series at frequency 2 
+#> 
+#> Fitting automatic forecast to series at frequency 1 
+#> 
+#> Reconciling original forecasts
+#> 
+#> Plotting simulation forecast (lines) and true values (ytest points) for NEON plot_ID 4
+```
+
+![](README-unnamed-chunk-2-1.png)
+
+    #> 
+    #> 
+    #> Calculating CRPS against ixodes_vets_dat$ytest
+    #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+    #>   11.95   35.86   41.98   62.58   56.71  186.07
+
 A `Docker` container has been built to ensure functions in this package can be used in future if dependencies make any drastic changes. You can install the container from `Dockerhub`. For example, using `singularity` this would read as:
 
 ``` r
@@ -53,8 +94,6 @@ RUN R -e "options(repos = \
   file = M, sep = '\n', append = TRUE); \
   install.packages('rstan', type = 'source'); \
   install.packages('remotes'); \
-  install.packages('forecast'); \
-  install.packages('thief'); \
   install.packages('brms'); \
   install.packages('here'); \
   install.packages('tidybayes'); \

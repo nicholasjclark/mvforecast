@@ -10,7 +10,7 @@
 #'@details The sum of the CRPS is calculated against the test observations in \code{y_test} and returned. Calculations
 #'use the \code{\link[scoringRules]{crps_sample}} function
 #'
-#'@return A base plot of the forecast mean (black line) and 95% prediction intervals (red dashed lines)
+#'@return A base plot of the forecast mean (black line) and 95 percent prediction intervals (red dashed lines)
 #'
 #'@export
 plot_vets_preds = function(simulation, main = '', ylab = 'Y'){

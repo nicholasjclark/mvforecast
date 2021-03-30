@@ -1,4 +1,4 @@
-#'calculate continuous rank probability score from a VETS model forecast distribution
+#'Calculate continuous rank probability score from a VETS model forecast distribution
 #'
 #'
 #'@importFrom parallel detectCores
