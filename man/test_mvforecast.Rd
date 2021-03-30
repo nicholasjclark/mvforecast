@@ -13,5 +13,6 @@ test_mvforecast(plot = TRUE)
 A plot from \code{\link{plot_vets_preds}} and a CRPS calculation from \code{\link{calc_crps}}
 }
 \description{
-This function fits a thief_vets model on the example ixodes_vets_dat dataset and returns a plot and a CRPS calculation
+This function fits a vets model and equivalent thief_vets model on the example ixodes_vets_dat dataset
+and returns a plot and a CRPS calculation
 }

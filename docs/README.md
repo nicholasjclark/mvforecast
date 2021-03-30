@@ -24,12 +24,15 @@ library(mvforecast)
 test_mvforecast()
 #> Loading the ixodes_vets_dat dataset
 #> 
-#> 
-#> Fitting a vets model with no regressors to series with frequency 52
+#> Fitting a vets model with common seasonal smoothing and grouped level smoothing
 #> Registered S3 method overwritten by 'GGally':
 #>   method from   
 #>   +.gg   ggplot2
 #> sROC 0.1-2 loaded
+#> Fitting an equivalent model that then uses hierarchical reconciliation
+#> 
+#> 
+#> Fitting a vets model with no regressors to series with frequency 52 
 #> 
 #> Fitting automatic forecast to series at frequency 26 
 #> 
@@ -43,16 +46,17 @@ test_mvforecast()
 #> 
 #> Reconciling original forecasts
 #> 
-#> Plotting simulation forecast (lines) and true values (ytest points) for NEON plot_ID 4
+#> Plotting thief simulation forecast (lines) and true values (ytest points) for NEON plot_ID 4
 ```
 
 ![](README-unnamed-chunk-2-1.png)
 
     #> 
     #> 
-    #> Calculating CRPS against ixodes_vets_dat$ytest
-    #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-    #>   11.95   35.86   41.98   62.58   56.71  186.07
+    #> Calculating CRPS against ixodes_vets_dat$ytest for both models (lower is better)
+    #>                     Min. X1st.Qu.   Median      Mean  X3rd.Qu.     Max.
+    #> vets_crps       21.81187 77.25297 96.05023 125.73973 141.01221 271.6396
+    #> thief_vets_crps 11.81485 36.52212 42.65966  62.93796  56.94122 185.2243
 
 A `Docker` container has been built to ensure functions in this package can be used in future if dependencies make any drastic changes. You can install the container from `Dockerhub`. For example, using `singularity` this would read as:
 
@@ -104,10 +108,6 @@ RUN R -e "options(repos = \
   install.packages('ggplot2'); \
   install.packages('viridis'); \
   install.packages('reshape'); \
-  remotes::install_github('tsmodels/tsmethods@16601e3bd21d7293490d820137324e4f16462dbf', dependencies = TRUE); \
-  remotes::install_github('tsmodels/tsaux@da46a751c619ba10184f0749ccd7d9fb9a7be31f', dependencies = TRUE); \
-  remotes::install_github('tsmodels/tsets@51a26d80fdfafc41d564d08a38fe4c9776ba333f', dependencies = TRUE); \
-  remotes::install_github('tsmodels/tsvets@7bea965911ddee0c585199cb380b1299e341273b', dependencies = TRUE); \
   remotes::install_github('nicholasjclark/mvforecast', dependencies = TRUE); \
   remotes::install_github('asael697/varstan@5378f428cad9560dae7f6daf8f431113f19a2019', dependencies = TRUE)"
 
