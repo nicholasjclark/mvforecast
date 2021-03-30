@@ -21,8 +21,68 @@ This is a work-in-progress package to fit a variety of multivariate timeseries m
 You can install the development version from `GitHub` using:
 
 ```{r gh-installation, eval = FALSE}
-# install.packages("devtools")
+install.packages("devtools")
 devtools::install_github("nicholasjclark/mvforecast")
 ```
-  
+
+A `Docker` container has been built to ensure functions in this package can be used in future if dependencies make any drastic changes. You can install the container from `Dockerhub`. For example, using `singularity` this would read as:
+```{r, eval = FALSE}
+singularity pull docker://nicholasjclark/brms
+singularity shell brms_latest.sif
+R
+```
+
+Interested users can create their own containers to add further functionality or add additional libraries. The entire `Dockerfile` reads as:
+```{r, eval = FALSE}
+FROM lcolling/r-verse-base:latest
+
+# Use clang to compile Stan
+# Using the default g++ causes memory issues
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    clang
+
+RUN apt-get install -y --no-install-recommends libudunits2-dev
+RUN apt-get install -y --no-install-recommends libgdal-dev
+RUN apt-get update && apt-get install -y --no-install-recommends libv8-dev
+
+RUN apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create a makevars file and install rstan from source
+# following the instructions at https://github.com/stan-dev/rstan/wiki/Installing-RStan-on-Linux
+# Install remaining necessary R packages using specific versions (latest as of February 2021)
+RUN R -e "options(repos = \
+  list(CRAN = 'https://mran.revolutionanalytics.com/snapshot/2021-02-01/')); \
+  dotR <- file.path(Sys.getenv('HOME'), '.R'); \
+  if (!file.exists(dotR)) dir.create(dotR); \
+  M <- file.path(dotR, 'Makevars'); \
+  if (!file.exists(M)) file.create(M); \
+  cat('\nCXX14FLAGS=-O3 -march=native -mtune=native -fPIC', \
+  'CXX14=clang++', \
+  file = M, sep = '\n', append = TRUE); \
+  install.packages('rstan', type = 'source'); \
+  install.packages('remotes'); \
+  install.packages('forecast'); \
+  install.packages('thief'); \
+  install.packages('brms'); \
+  install.packages('here'); \
+  install.packages('tidybayes'); \
+  install.packages('xfun'); \
+  install.packages('mgcv'); \
+  install.packages('prophet'); \
+  install.packages('pbapply'); \
+  install.packages('ggplot2'); \
+  install.packages('viridis'); \
+  install.packages('reshape'); \
+  remotes::install_github('tsmodels/tsmethods@16601e3bd21d7293490d820137324e4f16462dbf', dependencies = TRUE); \
+  remotes::install_github('tsmodels/tsaux@da46a751c619ba10184f0749ccd7d9fb9a7be31f', dependencies = TRUE); \
+  remotes::install_github('tsmodels/tsets@51a26d80fdfafc41d564d08a38fe4c9776ba333f', dependencies = TRUE); \
+  remotes::install_github('tsmodels/tsvets@7bea965911ddee0c585199cb380b1299e341273b', dependencies = TRUE); \
+  remotes::install_github('nicholasjclark/mvforecast', dependencies = TRUE); \
+  remotes::install_github('asael697/varstan@5378f428cad9560dae7f6daf8f431113f19a2019', dependencies = TRUE)"
+
+CMD [ "R" ]
+```
+
 *This project is licensed under the terms of the GNU General Public License (GNU GPLv3)*
