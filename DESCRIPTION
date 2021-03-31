@@ -13,8 +13,10 @@ Suggests: testthat,
     knitr, 
     rmarkdown
 VignetteBuilder: knitr
-Depends: R (>= 4.0.0), forecast
+Depends: R (>= 4.0.0), forecast, tsvets, tsets
 Imports: parallel,
+    tsmethods,
+    tsaux,
     xts,
     dplyr,
     lubridate,
