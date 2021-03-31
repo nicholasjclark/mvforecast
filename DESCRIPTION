@@ -13,10 +13,12 @@ Suggests: testthat,
     knitr, 
     rmarkdown
 VignetteBuilder: knitr
-Depends: R (>= 4.0.0), forecast, tsvets, tsets
+Depends: R (>= 4.0.0), forecast
 Imports: parallel,
     tsmethods,
     tsaux,
+    tsets,
+    tsvets,
     xts,
     dplyr,
     lubridate,
@@ -29,7 +31,7 @@ Imports: parallel,
     scoringRules
 Remotes: tsmodels/tsmethods@16601e3bd21d7293490d820137324e4f16462dbf,
     tsmodels/tsaux@da46a751c619ba10184f0749ccd7d9fb9a7be31f,
-    tsmodels/tsvets@7bea965911ddee0c585199cb380b1299e341273b,
-    tsmodels/tsets@51a26d80fdfafc41d564d08a38fe4c9776ba333f
+    tsmodels/tsets@51a26d80fdfafc41d564d08a38fe4c9776ba333f,
+    tsmodels/tsvets@7bea965911ddee0c585199cb380b1299e341273b
 URL: https://github.com/nicholasjclark/mvforecast
 BugReports: https://github.com/nicholasjclark/mvforecast/issues

@@ -2,4 +2,5 @@
 .Rhistory
 .RData
 doc
+docs
 testing_scripts.R

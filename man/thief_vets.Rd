@@ -109,7 +109,7 @@ ixodes_vets_dat$xreg_include
 head(ixodes_vets_dat$future_xreg)
 
 # Fit a vets model with no regressors and common seasonality with the tsvets package
-mod1 <- simulate(estimate(vets_modelspec(ixodes_vets_dat$y_train,
+mod1 <- tsvets:::simulate.tsvets.estimate(tsvets:::estimate.tsvets.spec(tsvets:::vets_modelspec(ixodes_vets_dat$y_train,
 level = "grouped",
 slope = "none",
 damped = "none",
@@ -139,7 +139,7 @@ dependence = "equicorrelation",
 frequency = 52,
 cores = parallel::detectCores() - 1,
 group = ixodes_vets_dat$groups,
-save_plots = F)
+save_plots = FALSE)
 
 calc_crps(simulation = mod2, y_test = ixodes_vets_dat$y_test)
 
