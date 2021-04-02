@@ -4,10 +4,10 @@
 #'
 #'@param x \code{vector} of values representing the distribution to be summarised
 #'@param coverage \code{numeric} value specifying the width of the HPD interval. Default is 0.95
-#'#'@return A \code{list} containing the reconciled forecast distributions for each series in \code{y}. Each element in
+#'@return A \code{list} containing the reconciled forecast distributions for each series in \code{y}. Each element in
 #'the \code{vector} with three values: lower estimate, median estimate and upper estimate of the HPD interval
 #'
-#'#'@export
+#'@export
 #'
 hpd <- function(x, coverage = 0.95)
 {

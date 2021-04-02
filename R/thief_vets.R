@@ -487,17 +487,38 @@ thief_vets = function(y,
     series_base <- lapply(seq_along(outcomes), function(x){
       base[[x]][[series]]
     })
-    series_resids <- lapply(seq_along(outcomes), function(x){
-      as.vector(residuals[[x]][[series]])
+    series_base <- lapply(seq_along(series_base), function(x){
+      series_base[[x]]$mean <- jitter(series_base[[x]]$mean, amount = 0.001)
+      series_base[[x]]
     })
+    series_resids <- lapply(seq_along(outcomes), function(x){
+      orig_resids <- as.vector(residuals[[x]][[series]])
+      # Resids must be a multiple of frequency for MinT reconciliation
+      jitter(tail(orig_resids, floor(length(orig_resids) / frequencies[x]) * frequencies[x]),
+             amount = 0.001)
+    })
+
     if(!is.null(lambda)){
-      series_reconciled <- suppressWarnings(reconcilethief_nonneg(forecasts = series_base,
+      series_reconciled <- try(suppressWarnings(reconcilethief_nonneg(forecasts = series_base,
                                                                   residuals = series_resids,
-                                                                  comb = 'struc'))
+                                                                  comb = 'sam')),
+                               silent = T)
+      if(inherits(series_reconciled, 'try-error')){
+        series_reconciled <- suppressWarnings(reconcilethief_nonneg(forecasts = series_base,
+                                                                        residuals = series_resids,
+                                                                        comb = 'struc'))
+      }
+
     } else {
-      series_reconciled <- suppressWarnings(thief::reconcilethief(forecasts = series_base,
-                                                                  residuals = series_resids,
-                                                                  comb = 'struc'))
+      series_reconciled <- try(suppressWarnings(reconcilethief(forecasts = series_base,
+                                                               residuals = series_resids,
+                                                               comb = 'sam')),
+                               silent = T)
+      if(inherits(series_reconciled, 'try-error')){
+        series_reconciled <- suppressWarnings(reconcilethief(forecasts = series_base,
+                                                             residuals = series_resids,
+                                                             comb = 'struc'))
+      }
     }
 
     # Return reconciled forecast for the lowest level of aggregation
