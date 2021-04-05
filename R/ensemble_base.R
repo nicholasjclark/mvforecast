@@ -21,117 +21,187 @@
 #'@export
 ensemble_base = function(y_series, y_freq, lambda, k){
 
+  # If enough observations exist, split into training and testing data
+  if(length(y_series) >= (y_freq * 3)){
+    cv <- TRUE
+    y_train <- subset(y_series, end = floor(length(y_series) * .66))
+    y_test <- subset(y_series, start = floor(length(y_series) * .66) + 1)
+  } else {
+    cv <- FALSE
+    y_train <- y_series
+    y_test <- rep(NA, (y_freq * k))
+  }
   # Try a thetaf model
-theta_base <- try(forecast::thetaf(y_series,
-                               h = y_freq * k),
+theta_base <- try(forecast::thetaf(y_train,
+                               h = length(y_test)),
                   silent = TRUE)
 if(inherits(theta_base, 'try-error')){
   use_theta <- FALSE
-  theta_mae <- rep(NA, y_freq)
+  theta_mae <- rep(NA, length(y_train))
 } else {
   use_theta <- TRUE
-  theta_mae <- tail(as.vector(abs(residuals(theta_base))), y_freq)
+  if(cv){
+    theta_mae <- abs(as.vector(theta_base$mean) - as.vector(y_test))
+    theta_base <- forecast::thetaf(y_series, h = y_freq * k)
+  } else {
+    theta_mae <- tail(as.vector(abs(residuals(theta_base))), length(y_test))
+  }
 }
 
 # Try an auto.arima model
-arima_base <- try(forecast::forecast(forecast::auto.arima(y_series,
+arima_base <- try(forecast::forecast(forecast::auto.arima(y_train,
                                                           lambda = lambda),
-                                                          h = y_freq * k),
+                                                          h = length(y_test)),
                                      silent = TRUE)
 if(inherits(arima_base, 'try-error')){
   use_arima <- FALSE
-  arima_mae <- rep(NA, y_freq)
+  arima_mae <- rep(NA, length(y_train))
 } else {
   use_arima <- TRUE
-  arima_mae <- tail(as.vector(abs(residuals(arima_base))), y_freq)
+  if(cv){
+    arima_mae <- abs(as.vector(arima_base$mean) - as.vector(y_test))
+    arima_base <- forecast::forecast(forecast::auto.arima(y_series,
+                                                          lambda = lambda),
+                                     h = y_freq * k)
+  } else {
+    arima_mae <- tail(as.vector(abs(residuals(arima_base))), length(y_test))
+  }
 }
 
 # Try an STLM with arima on the seasonally adjusted series model
-stlmar_base <- try(forecast::forecast(forecast::stlm(y_series,
+stlmar_base <- try(forecast::forecast(forecast::stlm(y_train,
                                                      method = 'arima',
                                                      lambda = lambda),
-                                     h = y_freq * k),
+                                     h = length(y_test)),
                   silent = TRUE)
 if(inherits(stlmar_base, 'try-error')){
   use_stlmar <- FALSE
-  stlmar_mae <- rep(NA, y_freq)
+  stlmar_mae <- rep(NA, length(y_train))
 } else {
   use_stlmar <- TRUE
-  stlmar_mae <- tail(as.vector(abs(residuals(stlmar_base))), y_freq)
+  if(cv){
+    stlmar_mae <- abs(as.vector(stlmar_base$mean) - as.vector(y_test))
+    stlmar_base <- forecast::forecast(forecast::stlm(y_series,
+                                                         method = 'arima',
+                                                         lambda = lambda),
+                                          h = y_freq * k)
+  } else {
+    stlmar_mae <- tail(as.vector(abs(residuals(stlmar_base))), length(y_test))
+  }
 }
 
 # Try a TBATS model
-tbats_base <- try(forecast::forecast(forecast::tbats(y_series,
+tbats_base <- try(forecast::forecast(forecast::tbats(y_train,
                                                  lambda = lambda),
-                                   h = y_freq * k),
+                                   h = length(y_test)),
                 silent = TRUE)
 if(inherits(tbats_base, 'try-error')){
   use_tbats <- FALSE
-  tbats_mae <- rep(NA, y_freq)
+  tbats_mae <- rep(NA, length(y_train))
 } else {
   use_tbats <- TRUE
-  tbats_mae <- tail(as.vector(abs(residuals(tbats_base))), y_freq)
+  if(cv){
+    tbats_mae <- abs(as.vector(tbats_base$mean) - as.vector(y_test))
+    tbats_base <- forecast::forecast(forecast::tbats(y_series,
+                                                         lambda = lambda),
+                                         h = y_freq * k)
+  } else {
+    tbats_mae <- tail(as.vector(abs(residuals(tbats_base))), length(y_test))
+  }
 }
 
 # Try an ETS model
 if(y_freq <= 24){
-  ets_base <- try(forecast::forecast(forecast::ets(y_series,
+  ets_base <- try(forecast::forecast(forecast::ets(y_train,
                                                    lambda = lambda),
-                                     h = y_freq * k),
+                                     h = length(y_test)),
                   silent = TRUE)
 } else {
-  ets_base <- try(forecast::forecast(forecast::stlf(y_series,
+  ets_base <- try(forecast::forecast(forecast::stlf(y_train,
                                                    lambda = lambda),
-                                     h = y_freq * k),
+                                     h = length(y_test)),
                   silent = TRUE)
 }
 
 if(inherits(ets_base, 'try-error')){
   use_ets <- FALSE
-  ets_mae <- rep(NA, y_freq)
+  ets_mae <- rep(NA, length(y_train))
 } else {
   use_ets <- TRUE
-  ets_mae <- tail(as.vector(abs(residuals(ets_base))), y_freq)
+  if(cv){
+    ets_mae <- abs(as.vector(ets_base$mean) - as.vector(y_test))
+    if(y_freq <= 24){
+      ets_base <- forecast::forecast(forecast::ets(y_series,
+                                                       lambda = lambda),
+                                         h = y_freq * k)
+    } else {
+      ets_base <- forecast::forecast(forecast::stlf(y_series,
+                                                   lambda = lambda),
+                                     h = y_freq * k)
+    }
+  } else {
+    ets_mae <- tail(as.vector(abs(residuals(ets_base))), length(y_test))
+  }
 }
 
 # Try a naive model
-naive_base <- try(forecast::naive(y_series,
-                                                 lambda = lambda,
-                                   h = y_freq * k),
+naive_base <- try(forecast::naive(y_train, lambda = lambda,
+                                   h = length(y_test)),
                 silent = TRUE)
 if(inherits(naive_base, 'try-error')){
   use_naive <- FALSE
-  naive_mae <- rep(NA, y_freq)
+  naive_mae <- rep(NA, length(y_train))
 } else {
   use_naive <- TRUE
-  naive_mae <- tail(as.vector(abs(residuals(naive_base))), y_freq)
+  if(cv){
+    naive_mae <- abs(as.vector(naive_base$mean) - as.vector(y_test))
+    naive_base <- forecast::naive(y_series, lambda = lambda,
+                                      h = y_freq * k)
+  } else {
+    naive_mae <- tail(as.vector(abs(residuals(naive_base))), length(y_test))
+  }
 }
 
 # Try an rwf model
-rwf_base <- try(forecast::rwf(y_series,
+rwf_base <- try(forecast::rwf(y_train,
                               lambda = lambda,
                               drift = TRUE,
-                              h = y_freq * k),
+                              h = length(y_test)),
                   silent = TRUE)
 if(inherits(rwf_base, 'try-error')){
   use_rwf <- FALSE
-  rwf_mae <- rep(NA, y_freq)
+  rwf_mae <- rep(NA, length(y_train))
 } else {
   use_rwf <- TRUE
-  rwf_mae <- tail(as.vector(abs(residuals(rwf_base))), y_freq)
+  if(cv){
+    rwf_mae <- abs(as.vector(rwf_base$mean) - as.vector(y_test))
+    rwf_base <- forecast::rwf(y_series,
+                                  lambda = lambda,
+                                  drift = TRUE,
+                                  h = y_freq * k)
+  } else {
+    rwf_mae <- tail(as.vector(abs(residuals(rwf_base))), length(y_test))
+  }
 }
 
 # Try an snaive model
-snaive_base <- try(forecast::snaive(y_series,
+snaive_base <- try(forecast::snaive(y_train,
                                   lambda = lambda,
-                                  h = y_freq * k),
+                                  h = length(y_test)),
                   silent = TRUE)
 if(inherits(snaive_base, 'try-error')){
   use_snaive <- FALSE
-  snaive_mae <- rep(NA, y_freq)
+  snaive_mae <- rep(NA, length(y_train))
 } else {
   use_snaive <- TRUE
-  snaive_mae <- tail(as.vector(abs(residuals(snaive_base))), y_freq)
+  if(cv){
+    snaive_mae <- abs(as.vector(snaive_base$mean) - as.vector(y_test))
+    snaive_base <- forecast::snaive(y_series,
+                                        lambda = lambda,
+                                        h = y_freq * k)
+  } else {
+    snaive_mae <- tail(as.vector(abs(residuals(snaive_base))), length(y_test))
+  }
 }
 
 # Bind MAE estimates together and remove any that are all NAs prior to optimisation
@@ -151,12 +221,11 @@ if(any(which(apply(maes, 2, FUN = function(x) length(which(is.na(x)))) == nrow(m
     length(which(is.na(x)))) == nrow(maes))]
 }
 
-# Scale against the appropriate naive model to convert the MAE to MASE
-if(y_freq > 3){
-  maes <- maes + 1 / (snaive_mae + 1)
-} else {
-  maes <- maes + 1 / (naive_mae + 1)
-}
+# Scale against the snaive model to convert the MAE to MASE
+# The scaling should depend on seasonality and should use naive when there is no seasonality.
+# But experimentation suggests the snaive will be
+# equivalent to the naive when seasonality is not present
+maes <- maes + 1 / (snaive_mae + 1)
 
 # Define the function to minimise
 opt_mae <- function(weights, maes) {
