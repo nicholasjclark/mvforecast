@@ -470,12 +470,27 @@ thief_vets = function(y,
     } else {
 
       # For higher levels of aggregation, use automatic forecasting to get best possible result
-      cat('\nFitting automatic forecast to series at frequency', frequencies[i], '\n')
+      cat('\nFitting ensemble forecasts to series at frequency', frequencies[i], '\n')
       for(j in seq_len(ncol(y))){
-        base[[i]][[j]] <- forecast::forecast(outcomes[[i]][,j],
-                                             lambda = lambda,
-                                             h = frequencies[i] * k)
-        residuals[[i]][[j]] <- base[[i]][[j]]$residuals
+
+          ensemble <- try(suppressWarnings(ensemble_base(y_series = outcomes[[i]][,j],
+                                    lambda = lambda,
+                                    y_freq = frequencies[i],
+                                    k = k)), silent = TRUE)
+
+          if(inherits(ensemble, 'try-error')){
+            base[[i]][[j]] <- forecast::forecast(outcomes[[i]][,j],
+                                                 lambda = lambda,
+                                                 h = k * frequencies[i])
+            residuals[[i]][[j]] <- residuals(forecast::forecast(outcomes[[i]][,j],
+                                                                lambda = lambda,
+                                                                h = k * frequencies[i]))
+
+          } else {
+            base[[i]][[j]] <- ensemble[[1]]
+            residuals[[i]][[j]] <- ensemble[[2]]
+          }
+
       }
 
     }
@@ -488,6 +503,7 @@ thief_vets = function(y,
       base[[x]][[series]]
     })
     series_base <- lapply(seq_along(series_base), function(x){
+      # In case any forecasts are constant, need to jitter so that covariances can be estimated
       series_base[[x]]$mean <- jitter(series_base[[x]]$mean, amount = 0.001)
       series_base[[x]]
     })
