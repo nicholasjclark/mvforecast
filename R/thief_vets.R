@@ -45,13 +45,13 @@
 #'@return A \code{list} containing the reconciled forecast distributions for each series in \code{y}. Each element in
 #'the \code{list} is a \code{horizon x 1000 matrix} of forecast predictions
 #'
-#'@seealso \code{\link[tsvets]{vets_modelspec}}, \code{\link[tsets]{ets_modelspec}}, \code{\link[forecast]{forecast}},
+#'@seealso \code{\link[tsvets]{vets_modelspec}}, \code{\link[tsets]{ets_modelspec}}, \code{\link{ensemble_base}},
 #'\code{\link[thief]{reconcilethief}}
 #'
 #'@details Series in \code{y} are aggregated at all possible levels up to annual using \code{\link[thief]{tsaggregates}}.
 #'\code{\link[tsvets]{estimate.tsvets.spec}} is used on the unaggregated (original series), and optionally on higher levels
 #'of aggregation down to a frequency of \code{multi_freq}. At frequencies below \code{multi_freq}, the best-fitting
-#'univariate model is chosen using automatic functionality in \code{\link[forecast]{forecast}}. Forecasts are reconciled
+#'univariate model is chosen using automatic ensembles in \code{\link{ensemble_base}}. Forecasts are reconciled
 #'using \code{\link[thief]{reconcilethief}} and are optionally constrained using non-negative optimisation if \code{lambda}
 #'is provided. Adjustments to the original unaggregated forecast are incorporated and a distribution of \code{1000} sample
 #'paths for each series' forecast are returned

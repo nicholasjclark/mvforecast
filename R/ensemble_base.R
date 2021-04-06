@@ -1,6 +1,6 @@
 #'Fit a series of univariate models and return a weighted ensemble forecast
 #'
-#'This function fits eight simple univariate forecast models to the series and calculates weights
+#'This function fits nine simple univariate forecast models to the series and calculates weights
 #'that minimise the mean absolute scaled error of a weighted ensemble forecast
 #'
 #'@param y_series A \code{ts} object containing the series to forecast
@@ -9,10 +9,16 @@
 #'between \code{0} and \code{1} inclusive
 #'@param k \code{integer} specifying the length of the forecast horizon in multiples of \code{frequency}
 #'
-#'@details A total of eight simple univariate models are tested on the series. These include
-#'\code{\link[forecast]{auto.arima}}, \code{\link[forecast]{tbats}}, \code{\link[forecast]{ets}},
-#'\code{\link[forecast]{thetaf}}, \code{\link[forecast]{stlm}} with ARIMA errors, \code{\link[forecast]{rwf}} with drift,
-#'\code{\link[forecast]{naive}} and \code{\link[forecast]{snaive}}. The mean absolute scaled error (MASE) of the in-sample
+#'@details A total of nine simple univariate models are tested on the series. These include
+#'\code{\link[forecast]{auto.arima}},
+#'\code{\link[forecast]{auto.arima}} with fourier regressors,
+#'\code{\link[forecast]{tbats}},
+#'\code{\link[forecast]{ets}},
+#'\code{\link[forecast]{thetaf}},
+#'\code{\link[forecast]{stlm}} with ARIMA errors,
+#'\code{\link[forecast]{rwf}} with drift,
+#'\code{\link[forecast]{naive}} and \code{\link[forecast]{snaive}}.
+#'The mean absolute scaled error (MASE) of the in-sample
 #'series is calculated for each series, and a weighted mean is optimised to minimise in-sample MASE using the
 #'"L-BFGS-B" algorithm in \code{\link[stats]{optim}}
 #'
@@ -31,7 +37,8 @@ ensemble_base = function(y_series, y_freq, lambda, k){
     y_train <- y_series
     y_test <- rep(NA, (y_freq * k))
   }
-  # Try a thetaf model
+
+# Try a thetaf model
 theta_base <- try(forecast::thetaf(y_train,
                                h = length(y_test)),
                   silent = TRUE)
@@ -65,6 +72,30 @@ if(inherits(arima_base, 'try-error')){
                                      h = y_freq * k)
   } else {
     arima_mae <- tail(as.vector(abs(residuals(arima_base))), length(y_test))
+  }
+}
+
+# Try an auto.arima model with four harmonic Fourier terms as regressors
+arimaf_base <- try(forecast::forecast(forecast::auto.arima(y_train,
+                                                           xreg = forecast::fourier(y_train, K = 4),
+                                                          lambda = lambda),
+                                     h = length(y_test),
+                                     xreg = forecast::fourier(y_train, K = 4, h = length(y_test))),
+                  silent = TRUE)
+if(inherits(arimaf_base, 'try-error')){
+  use_arimaf <- FALSE
+  arimaf_mae <- rep(NA, length(y_train))
+} else {
+  use_arimaf <- TRUE
+  if(cv){
+    arimaf_mae <- abs(as.vector(arimaf_base$mean) - as.vector(y_test))
+    arimaf_base <- forecast::forecast(forecast::auto.arima(y_series,
+                                                           xreg = forecast::fourier(y_train, K = 4),
+                                                           lambda = lambda),
+                                      h = y_freq * k,
+                                      xreg = forecast::fourier(y_series, K = 4, h = y_freq * k))
+  } else {
+    arimaf_mae <- tail(as.vector(abs(residuals(arimaf_base))), length(y_test))
   }
 }
 
@@ -112,8 +143,10 @@ if(inherits(tbats_base, 'try-error')){
 
 # Try an ETS model
 if(y_freq <= 24){
-  ets_base <- try(forecast::forecast(forecast::ets(y_train,
-                                                   lambda = lambda),
+  ets_base <- try(forecast::forecast(forecast::baggedModel(y_train,
+                                                   lambda = lambda,
+                                                   fn = 'ets',
+                                                   bootstrapped_series = forecast::bld.mbb.bootstrap(y_train, 50)),
                                      h = length(y_test)),
                   silent = TRUE)
 } else {
@@ -131,8 +164,10 @@ if(inherits(ets_base, 'try-error')){
   if(cv){
     ets_mae <- abs(as.vector(ets_base$mean) - as.vector(y_test))
     if(y_freq <= 24){
-      ets_base <- forecast::forecast(forecast::ets(y_series,
-                                                       lambda = lambda),
+      ets_base <- forecast::forecast(forecast::baggedModel(y_series,
+                                                       lambda = lambda,
+                                                       fn = 'ets',
+                                                       bootstrapped_series = forecast::bld.mbb.bootstrap(y_series, 50)),
                                          h = y_freq * k)
     } else {
       ets_base <- forecast::forecast(forecast::stlf(y_series,
@@ -207,13 +242,14 @@ if(inherits(snaive_base, 'try-error')){
 # Bind MAE estimates together and remove any that are all NAs prior to optimisation
 maes <- cbind(theta_mae,
               arima_mae,
+              arimaf_mae,
               stlmar_mae,
               tbats_mae,
               ets_mae,
               naive_mae,
               rwf_mae,
               snaive_mae)
-colnames(maes) <- c('theta', 'arima', 'stlmar', 'tbats', 'ets',
+colnames(maes) <- c('theta', 'arima', 'arimaf', 'stlmar', 'tbats', 'ets',
                     'naive', 'rwf', 'snaive')
 
 if(any(which(apply(maes, 2, FUN = function(x) length(which(is.na(x)))) == nrow(maes)))){
@@ -301,13 +337,14 @@ weight_fcs = function(fcs, ens_weights){
 # Gather the base forecasts and calculate the ensemble
 fcs <- list(theta_base,
             arima_base,
+            arimaf_base,
             stlmar_base,
             tbats_base,
             ets_base,
             naive_base,
             rwf_base,
             snaive_base)
-names(fcs) <- c('theta', 'arima', 'stlmar', 'tbats', 'ets',
+names(fcs) <- c('theta', 'arima', 'arimaf','stlmar', 'tbats', 'ets',
                 'naive', 'rwf', 'snaive')
 fcs <- fcs[names(fcs) %in% names(ens_weights)]
 ensemble <- weight_fcs(fcs = fcs, ens_weights = ens_weights)

@@ -92,7 +92,7 @@ higher levels of temporal aggregation for a multivariate xts timeseries object
 Series in \code{y} are aggregated at all possible levels up to annual using \code{\link[thief]{tsaggregates}}.
 \code{\link[tsvets]{estimate.tsvets.spec}} is used on the unaggregated (original series), and optionally on higher levels
 of aggregation down to a frequency of \code{multi_freq}. At frequencies below \code{multi_freq}, the best-fitting
-univariate model is chosen using automatic functionality in \code{\link[forecast]{forecast}}. Forecasts are reconciled
+univariate model is chosen using automatic ensembles in \code{\link{ensemble_base}}. Forecasts are reconciled
 using \code{\link[thief]{reconcilethief}} and are optionally constrained using non-negative optimisation if \code{lambda}
 is provided. Adjustments to the original unaggregated forecast are incorporated and a distribution of \code{1000} sample
 paths for each series' forecast are returned
@@ -157,6 +157,6 @@ Athanasopoulos, G., Hyndman, R.,  Kourentzes, N.,  and Petropoulos, F. Forecasti
 (2017) European Journal of Operational Research 262(1) 60–74
 }
 \seealso{
-\code{\link[tsvets]{vets_modelspec}}, \code{\link[tsets]{ets_modelspec}}, \code{\link[forecast]{forecast}},
+\code{\link[tsvets]{vets_modelspec}}, \code{\link[tsets]{ets_modelspec}}, \code{\link{ensemble_base}},
 \code{\link[thief]{reconcilethief}}
 }

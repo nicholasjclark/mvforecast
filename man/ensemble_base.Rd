@@ -2,7 +2,7 @@
 % Please edit documentation in R/ensemble_base.R
 \name{ensemble_base}
 \alias{ensemble_base}
-\title{Fit a series of univariate models and return a weighted ensemble hat minimises mean absolute error}
+\title{Fit a series of univariate models and return a weighted ensemble forecast}
 \usage{
 ensemble_base(y_series, y_freq, lambda, k)
 }
@@ -20,14 +20,20 @@ between \code{0} and \code{1} inclusive}
 A \code{list} object containing the ensemble forecast and the ensemble residuals
 }
 \description{
-This function fits eight simple univariate forecast models to the series and calculates weights
-that minimise the mean absolute error of a weighted ensemble forecast
+This function fits nine simple univariate forecast models to the series and calculates weights
+that minimise the mean absolute scaled error of a weighted ensemble forecast
 }
 \details{
-A total of eight simple univariate models are tested on the series. These include
-\code{\link[forecast]{auto.arima}}, \code{\link[forecast]{tbats}}, \code{\link[forecast]{ets}},
-\code{\link[forecast]{thetaf}}, \code{\link[forecast]{stlm}} with ARIMA errors, \code{\link[forecast]{rwf}} with drift,
-\code{\link[forecast]{naive}} and \code{\link[forecast]{snaive}}. The mean absolute error (MAE) of the in-sample
-series is calculated for each series, and a weighted mean is optimised to minimise in-sample MAE using the
+A total of nine simple univariate models are tested on the series. These include
+\code{\link[forecast]{auto.arima}},
+\code{\link[forecast]{auto.arima}} with fourier regressors,
+\code{\link[forecast]{tbats}},
+\code{\link[forecast]{ets}},
+\code{\link[forecast]{thetaf}},
+\code{\link[forecast]{stlm}} with ARIMA errors,
+\code{\link[forecast]{rwf}} with drift,
+\code{\link[forecast]{naive}} and \code{\link[forecast]{snaive}}.
+The mean absolute scaled error (MASE) of the in-sample
+series is calculated for each series, and a weighted mean is optimised to minimise in-sample MASE using the
 "L-BFGS-B" algorithm in \code{\link[stats]{optim}}
 }
