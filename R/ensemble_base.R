@@ -10,17 +10,18 @@
 #'@param k \code{integer} specifying the length of the forecast horizon in multiples of \code{frequency}
 #'
 #'@details A total of nine simple univariate models are tested on the series. These include
-#'\code{\link[forecast]{auto.arima}},
-#'\code{\link[forecast]{auto.arima}} with fourier regressors,
+#'\code{\link[forecast]{auto.arima}} with exponentially weighted moving average regressors,
+#'\code{\link[forecast]{auto.arima}} with fourier terms \code{K = 4} regressors,
 #'\code{\link[forecast]{tbats}},
 #'\code{\link[forecast]{ets}},
 #'\code{\link[forecast]{thetaf}},
 #'\code{\link[forecast]{stlm}} with ARIMA errors,
 #'\code{\link[forecast]{rwf}} with drift,
-#'\code{\link[forecast]{naive}} and \code{\link[forecast]{snaive}}.
+#'\code{\link[forecast]{naive}} and
+#'\code{\link[forecast]{snaive}}.
 #'The mean absolute scaled error (MASE) of the in-sample
-#'series is calculated for each series, and a weighted mean is optimised to minimise in-sample MASE using the
-#'"L-BFGS-B" algorithm in \code{\link[stats]{optim}}
+#'series is calculated for each series, and a weighted mean is optimised to
+#'minimise in-sample MASE using the "L-BFGS-B" algorithm in \code{\link[stats]{optim}}.
 #'
 #'@return A \code{list} object containing the ensemble forecast and the ensemble residuals
 #'
@@ -28,14 +29,14 @@
 ensemble_base = function(y_series, y_freq, lambda, k){
 
   # If enough observations exist, split into training and testing data
-  if(length(y_series) >= (y_freq * 3)){
+  if(length(y_series) >= (y_freq * 4)){
     cv <- TRUE
-    y_train <- subset(y_series, end = floor(length(y_series) * .66))
-    y_test <- subset(y_series, start = floor(length(y_series) * .66) + 1)
+    y_train <- subset(y_series, end = floor(length(y_series) * .7))
+    y_test <- subset(y_series, start = floor(length(y_series) * .7) + 1)
   } else {
     cv <- FALSE
     y_train <- y_series
-    y_test <- rep(NA, (y_freq * k))
+    y_test <- rep(NA, c(length(y_series), y_freq * k)[which.min(c(0, (y_freq * k) - length(y_series)))])
   }
 
 # Try a thetaf model
@@ -44,7 +45,7 @@ theta_base <- try(forecast::thetaf(y_train,
                   silent = TRUE)
 if(inherits(theta_base, 'try-error')){
   use_theta <- FALSE
-  theta_mae <- rep(NA, length(y_train))
+  theta_mae <- rep(NA, length(y_test))
 } else {
   use_theta <- TRUE
   if(cv){
@@ -55,21 +56,68 @@ if(inherits(theta_base, 'try-error')){
   }
 }
 
-# Try an auto.arima model
+# Try an auto.arima model with exponentially weighted moving average regressors
+if(y_freq >= 12){
+  windows <- unique(ceiling(seq(3, y_freq / 2, length.out = 5)))
+} else if (y_freq >= 6) {
+  windows <- unique(ceiling(seq(1, y_freq / 2, length.out = 3)))
+} else {
+  windows <- unique(seq(1, y_freq, length.out = 3))
+}
+
+ewma_filter <- function (x, ratio) {
+  c(stats::filter(x * ratio, 1 - ratio, "recursive", init = x[1]))
+}
+
+ewma <- matrix(NA, nrow = length(y_train), ncol = length(windows))
+for(i in seq_along(windows)){
+  ewma[,i] <- ewma_filter(as.vector(zoo::rollmean(y_train,
+                                                  k = ceiling(windows[i] ^ 0.8),
+                                                  na.pad = TRUE,
+                                                  fill = 0)),
+                          ratio = (2 / (windows[i] + 1)))
+}
+
+ewma_fc <- matrix(NA, nrow = length(y_test), ncol = ncol(ewma))
+for(i in 1:ncol(ewma)){
+  # Add Gaussian noise to forecasted moving averages for better generalizability
+  ewma_fc[,i] <- jitter(forecast::forecast(ewma[,i], h = length(y_test))$mean, amount = 0.1)
+}
+
 arima_base <- try(forecast::forecast(forecast::auto.arima(y_train,
-                                                          lambda = lambda),
-                                                          h = length(y_test)),
+                                                          lambda = lambda,
+                                                          xreg = ewma),
+                                     h = length(y_test),
+                                     xreg = ewma_fc),
                                      silent = TRUE)
+
 if(inherits(arima_base, 'try-error')){
   use_arima <- FALSE
-  arima_mae <- rep(NA, length(y_train))
+  arima_mae <- rep(NA, length(y_test))
 } else {
   use_arima <- TRUE
   if(cv){
     arima_mae <- abs(as.vector(arima_base$mean) - as.vector(y_test))
-    arima_base <- forecast::forecast(forecast::auto.arima(y_series,
-                                                          lambda = lambda),
-                                     h = y_freq * k)
+
+    ewma <- matrix(NA, nrow = length(y_series), ncol = length(windows))
+    for(i in seq_along(windows)){
+      ewma[,i] <- ewma_filter(as.vector(zoo::rollmean(y_series,
+                                                      k = ceiling(windows[i] ^ 0.8),
+                                                      na.pad = TRUE,
+                                                      fill = 0)),
+                              ratio = (2 / (windows[i] + 1)))
+    }
+
+    ewma_fc <- matrix(NA, nrow = length(y_freq * k), ncol = ncol(ewma))
+    for(i in 1:ncol(ewma)){
+      ewma_fc[,i] <- jitter(forecast::forecast(ewma[,i], h = length(y_test))$mean, amount = 0.1)
+    }
+
+    arima_base <- forecast::forecast(forecast::auto.arima(y_train,
+                                                          lambda = lambda,
+                                                          xreg = ewma),
+                                     h = y_freq * k,
+                                     xreg = ewma_fc)
   } else {
     arima_mae <- tail(as.vector(abs(residuals(arima_base))), length(y_test))
   }
@@ -80,20 +128,24 @@ arimaf_base <- try(forecast::forecast(forecast::auto.arima(y_train,
                                                            xreg = forecast::fourier(y_train, K = 4),
                                                           lambda = lambda),
                                      h = length(y_test),
-                                     xreg = forecast::fourier(y_train, K = 4, h = length(y_test))),
+
+                                     # Add Gaussian noise to forecasted terms for better generalizability
+                                     xreg = jitter(forecast::fourier(y_train, K = 4, h = length(y_test)),
+                                                   amount = 0.1)),
                   silent = TRUE)
 if(inherits(arimaf_base, 'try-error')){
   use_arimaf <- FALSE
-  arimaf_mae <- rep(NA, length(y_train))
+  arimaf_mae <- rep(NA, length(y_test))
 } else {
   use_arimaf <- TRUE
   if(cv){
     arimaf_mae <- abs(as.vector(arimaf_base$mean) - as.vector(y_test))
     arimaf_base <- forecast::forecast(forecast::auto.arima(y_series,
-                                                           xreg = forecast::fourier(y_train, K = 4),
+                                                           xreg = forecast::fourier(y_series, K = 4),
                                                            lambda = lambda),
                                       h = y_freq * k,
-                                      xreg = forecast::fourier(y_series, K = 4, h = y_freq * k))
+                                      xreg = jitter(forecast::fourier(y_series, K = 4, h = y_freq * k),
+                                                    amount = 0.1))
   } else {
     arimaf_mae <- tail(as.vector(abs(residuals(arimaf_base))), length(y_test))
   }
@@ -107,7 +159,7 @@ stlmar_base <- try(forecast::forecast(forecast::stlm(y_train,
                   silent = TRUE)
 if(inherits(stlmar_base, 'try-error')){
   use_stlmar <- FALSE
-  stlmar_mae <- rep(NA, length(y_train))
+  stlmar_mae <- rep(NA, length(y_test))
 } else {
   use_stlmar <- TRUE
   if(cv){
@@ -128,7 +180,7 @@ tbats_base <- try(forecast::forecast(forecast::tbats(y_train,
                 silent = TRUE)
 if(inherits(tbats_base, 'try-error')){
   use_tbats <- FALSE
-  tbats_mae <- rep(NA, length(y_train))
+  tbats_mae <- rep(NA, length(y_test))
 } else {
   use_tbats <- TRUE
   if(cv){
@@ -158,7 +210,7 @@ if(y_freq <= 24){
 
 if(inherits(ets_base, 'try-error')){
   use_ets <- FALSE
-  ets_mae <- rep(NA, length(y_train))
+  ets_mae <- rep(NA, length(y_test))
 } else {
   use_ets <- TRUE
   if(cv){
@@ -185,7 +237,7 @@ naive_base <- try(forecast::naive(y_train, lambda = lambda,
                 silent = TRUE)
 if(inherits(naive_base, 'try-error')){
   use_naive <- FALSE
-  naive_mae <- rep(NA, length(y_train))
+  naive_mae <- rep(NA, length(y_test))
 } else {
   use_naive <- TRUE
   if(cv){
@@ -205,7 +257,7 @@ rwf_base <- try(forecast::rwf(y_train,
                   silent = TRUE)
 if(inherits(rwf_base, 'try-error')){
   use_rwf <- FALSE
-  rwf_mae <- rep(NA, length(y_train))
+  rwf_mae <- rep(NA, length(y_test))
 } else {
   use_rwf <- TRUE
   if(cv){
@@ -226,7 +278,7 @@ snaive_base <- try(forecast::snaive(y_train,
                   silent = TRUE)
 if(inherits(snaive_base, 'try-error')){
   use_snaive <- FALSE
-  snaive_mae <- rep(NA, length(y_train))
+  snaive_mae <- rep(NA, length(y_test))
 } else {
   use_snaive <- TRUE
   if(cv){
