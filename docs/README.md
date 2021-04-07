@@ -54,9 +54,9 @@ test_mvforecast()
     #> 
     #> 
     #> Calculating CRPS against ixodes_vets_dat$ytest for both models (lower is better)
-    #>                      Min. X1st.Qu.    Median     Mean  X3rd.Qu.     Max.
-    #> vets_crps       22.927391 72.58091 105.00484 132.7838 144.82310 300.6348
-    #> thief_vets_crps  8.885075 27.36561  32.42859  54.3514  45.64663 185.7502
+    #>                     Min. X1st.Qu.    Median      Mean X3rd.Qu.     Max.
+    #> vets_crps       22.31445 78.05005 103.46469 128.69087 141.7844 281.9857
+    #> thief_vets_crps 10.90538 33.79138  41.19874  58.90814  64.5170 162.4705
 
 Reconciliation is clearly a powerful technique that can drastically improve forecasts for many types of time series. In the interest of transparency and robust software engineering, a `Docker` container has been built to ensure functions in this package can be used in future if dependencies make any drastic changes. You can install the container from `Dockerhub`. For example, using `singularity` this would read as:
 

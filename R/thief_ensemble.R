@@ -126,7 +126,8 @@ thief_ensemble = function(y,
           ensemble <- try(suppressWarnings(ensemble_base(y_series = outcomes[[i]][,j],
                                     lambda = lambda,
                                     y_freq = frequencies[i],
-                                    k = k)), silent = TRUE)
+                                    k = k,
+                                    bottom_series = ifelse(i == 1, TRUE, FALSE))), silent = TRUE)
 
           if(inherits(ensemble, 'try-error')){
             base[[i]][[j]] <- forecast::forecast(outcomes[[i]][,j],

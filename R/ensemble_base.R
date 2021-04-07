@@ -8,6 +8,8 @@
 #'@param lambda \code{numeric proportional}. The Box Cox power transformation parameter for all series. Must be
 #'between \code{0} and \code{1} inclusive
 #'@param k \code{integer} specifying the length of the forecast horizon in multiples of \code{frequency}
+#'@param bottom_series \code{logical}. If \code{TRUE}, the two \code{auto.arima} models will be ignored
+#'to ensure bottom level series forecasts are not overconfident
 #'
 #'@details A total of nine simple univariate models are tested on the series. These include
 #'\code{\link[forecast]{auto.arima}} with exponentially weighted moving average regressors,
@@ -26,7 +28,7 @@
 #'@return A \code{list} object containing the ensemble forecast and the ensemble residuals
 #'
 #'@export
-ensemble_base = function(y_series, y_freq, lambda, k){
+ensemble_base = function(y_series, y_freq, lambda, k, bottom_series = FALSE){
 
   # If enough observations exist, split into training and testing data
   if(length(y_series) >= (y_freq * 4)){
@@ -56,13 +58,15 @@ if(inherits(theta_base, 'try-error')){
   }
 }
 
+if(!bottom_series){
+
 # Try an auto.arima model with exponentially weighted moving average regressors
 if(y_freq >= 12){
-  windows <- unique(ceiling(seq(3, y_freq / 2, length.out = 5)))
+  windows <- unique(ceiling(seq(3, y_freq / 2, length.out = 4)))
 } else if (y_freq >= 6) {
   windows <- unique(ceiling(seq(1, y_freq / 2, length.out = 3)))
 } else {
-  windows <- unique(seq(1, y_freq, length.out = 3))
+  windows <- unique(seq(1, y_freq, length.out = 2))
 }
 
 ewma_filter <- function (x, ratio) {
@@ -150,6 +154,7 @@ if(inherits(arimaf_base, 'try-error')){
     arimaf_mae <- tail(as.vector(abs(residuals(arimaf_base))), length(y_test))
   }
 }
+}
 
 # Try an STLM with arima on the seasonally adjusted series model
 stlmar_base <- try(forecast::forecast(forecast::stlm(y_train,
@@ -195,11 +200,11 @@ if(inherits(tbats_base, 'try-error')){
 
 # Try an ETS model
 if(y_freq <= 24){
-  ets_base <- try(forecast::forecast(forecast::baggedModel(y_train,
-                                                   lambda = lambda,
-                                                   fn = 'ets',
-                                                   bootstrapped_series = forecast::bld.mbb.bootstrap(y_train, 50)),
-                                     h = length(y_test)),
+  ets_base <- try(forecast::forecast(forecast::baggedETS(y_train,
+                                                         bootstrapped_series = forecast::bld.mbb.bootstrap(y_train, 20),
+                                                         lambda = lambda),
+                                     h = length(y_test),
+                                     lambda = lambda),
                   silent = TRUE)
 } else {
   ets_base <- try(forecast::forecast(forecast::stlf(y_train,
@@ -216,11 +221,10 @@ if(inherits(ets_base, 'try-error')){
   if(cv){
     ets_mae <- abs(as.vector(ets_base$mean) - as.vector(y_test))
     if(y_freq <= 24){
-      ets_base <- forecast::forecast(forecast::baggedModel(y_series,
-                                                       lambda = lambda,
-                                                       fn = 'ets',
-                                                       bootstrapped_series = forecast::bld.mbb.bootstrap(y_series, 50)),
-                                         h = y_freq * k)
+      ets_base <- forecast::forecast(forecast::baggedETS(y_series,
+                                                         bootstrapped_series = forecast::bld.mbb.bootstrap(y_series, 20),
+                                                         lambda = lambda),
+                                         h = y_freq * k, lambda = lambda)
     } else {
       ets_base <- forecast::forecast(forecast::stlf(y_series,
                                                    lambda = lambda),
@@ -292,17 +296,30 @@ if(inherits(snaive_base, 'try-error')){
 }
 
 # Bind MAE estimates together and remove any that are all NAs prior to optimisation
-maes <- cbind(theta_mae,
-              arima_mae,
-              arimaf_mae,
-              stlmar_mae,
-              tbats_mae,
-              ets_mae,
-              naive_mae,
-              rwf_mae,
-              snaive_mae)
-colnames(maes) <- c('theta', 'arima', 'arimaf', 'stlmar', 'tbats', 'ets',
-                    'naive', 'rwf', 'snaive')
+if(!bottom_series){
+  maes <- cbind(theta_mae,
+                arima_mae,
+                arimaf_mae,
+                stlmar_mae,
+                tbats_mae,
+                ets_mae,
+                naive_mae,
+                rwf_mae,
+                snaive_mae)
+  colnames(maes) <- c('theta', 'arima', 'arimaf', 'stlmar', 'tbats', 'ets',
+                      'naive', 'rwf', 'snaive')
+} else {
+  maes <- cbind(theta_mae,
+                stlmar_mae,
+                tbats_mae,
+                ets_mae,
+                naive_mae,
+                rwf_mae,
+                snaive_mae)
+  colnames(maes) <- c('theta', 'stlmar', 'tbats', 'ets',
+                      'naive', 'rwf', 'snaive')
+}
+
 
 if(any(which(apply(maes, 2, FUN = function(x) length(which(is.na(x)))) == nrow(maes)))){
   maes <- maes[,-which(apply(maes, 2, FUN = function(x)
@@ -328,7 +345,7 @@ opt <- optim(weights,
              opt_mae,
              maes = maes,
              method = "L-BFGS-B", lower = 0, upper = 1,
-             control = list(trace = 0, maxit = 10000))
+             control = list(trace = 0, maxit = 100000))
 ens_weights <- opt$par
 names(ens_weights) <- colnames(maes)
 
@@ -387,17 +404,30 @@ weight_fcs = function(fcs, ens_weights){
 }
 
 # Gather the base forecasts and calculate the ensemble
-fcs <- list(theta_base,
-            arima_base,
-            arimaf_base,
-            stlmar_base,
-            tbats_base,
-            ets_base,
-            naive_base,
-            rwf_base,
-            snaive_base)
-names(fcs) <- c('theta', 'arima', 'arimaf','stlmar', 'tbats', 'ets',
-                'naive', 'rwf', 'snaive')
+if(!bottom_series){
+  fcs <- list(theta_base,
+              arima_base,
+              arimaf_base,
+              stlmar_base,
+              tbats_base,
+              ets_base,
+              naive_base,
+              rwf_base,
+              snaive_base)
+  names(fcs) <- c('theta', 'arima', 'arimaf','stlmar', 'tbats', 'ets',
+                  'naive', 'rwf', 'snaive')
+} else {
+  fcs <- list(theta_base,
+              stlmar_base,
+              tbats_base,
+              ets_base,
+              naive_base,
+              rwf_base,
+              snaive_base)
+  names(fcs) <- c('theta', 'stlmar', 'tbats', 'ets',
+                  'naive', 'rwf', 'snaive')
+}
+
 fcs <- fcs[names(fcs) %in% names(ens_weights)]
 ensemble <- weight_fcs(fcs = fcs, ens_weights = ens_weights)
 
