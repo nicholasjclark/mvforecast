@@ -34,15 +34,15 @@ test_mvforecast()
 #> 
 #> Fitting a vets model with no regressors to series with frequency 52 
 #> 
-#> Fitting automatic forecast to series at frequency 26 
+#> Fitting ensemble forecasts to series at frequency 26 
 #> 
-#> Fitting automatic forecast to series at frequency 13 
+#> Fitting ensemble forecasts to series at frequency 13 
 #> 
-#> Fitting automatic forecast to series at frequency 4 
+#> Fitting ensemble forecasts to series at frequency 4 
 #> 
-#> Fitting automatic forecast to series at frequency 2 
+#> Fitting ensemble forecasts to series at frequency 2 
 #> 
-#> Fitting automatic forecast to series at frequency 1 
+#> Fitting ensemble forecasts to series at frequency 1 
 #> 
 #> Reconciling original forecasts
 #> 
@@ -54,9 +54,9 @@ test_mvforecast()
     #> 
     #> 
     #> Calculating CRPS against ixodes_vets_dat$ytest for both models (lower is better)
-    #>                     Min. X1st.Qu.   Median      Mean  X3rd.Qu.     Max.
-    #> vets_crps       21.91860 75.72644 97.43491 126.76146 138.28676 282.8868
-    #> thief_vets_crps 11.86312 35.81196 43.25483  62.41912  57.11869 185.4471
+    #>                      Min. X1st.Qu.    Median     Mean  X3rd.Qu.     Max.
+    #> vets_crps       22.927391 72.58091 105.00484 132.7838 144.82310 300.6348
+    #> thief_vets_crps  8.885075 27.36561  32.42859  54.3514  45.64663 185.7502
 
 Reconciliation is clearly a powerful technique that can drastically improve forecasts for many types of time series. In the interest of transparency and robust software engineering, a `Docker` container has been built to ensure functions in this package can be used in future if dependencies make any drastic changes. You can install the container from `Dockerhub`. For example, using `singularity` this would read as:
 
