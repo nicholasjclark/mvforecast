@@ -47,8 +47,8 @@ c("none", "common", "diagonal", "full", "grouped")}
 \item{seasonal}{\code{character}. The dynamics for the seasonal component in the \code{tsvets} model. Options are:
 c("none", "common", "diagonal", "full", "grouped")}
 
-\item{lambda}{\code{numeric proportional}. The Box Cox power transformation parameter for all series. Must be
-between \code{0} and \code{1} inclusive}
+\item{lambda}{\code{numeric proportional}. The multivariate Box Cox power transformation parameter for all series.
+Must be between \code{0} and \code{1.5} inclusive}
 
 \item{dependence}{\code{character}. The multivariate error dependence structure to impose. Options are:
 c("diagonal", "full", "equicorrelation", "shrinkage")}

@@ -5,12 +5,12 @@
 #'
 #'@param y_series A \code{ts} object containing the series to forecast
 #'@param y_freq The frequency of \code{y_series}
-#'@param lambda \code{numeric proportional}. The Box Cox power transformation parameter for all series. Must be
-#'between \code{0} and \code{1} inclusive
+#'@param lambda \code{numeric}. The Box Cox power transformation parameter for all series. Must be
+#'between \code{-1} and \code{2} inclusive. If \code{y_series} contains zeros, \code{lambda} will be set to
+#'\code{max(c(0.7, lambda))} to ensure stability of forecasts
 #'@param k \code{integer} specifying the length of the forecast horizon in multiples of \code{frequency}
 #'@param bottom_series \code{logical}. If \code{TRUE}, the two \code{auto.arima} models will be ignored
 #'to ensure bottom level series forecasts are not overconfident
-#'
 #'@details A total of nine simple univariate models are tested on the series. These include
 #'\code{\link[forecast]{auto.arima}} with exponentially weighted moving average regressors,
 #'\code{\link[forecast]{auto.arima}} with fourier terms \code{K = 4} regressors,
@@ -28,7 +28,20 @@
 #'@return A \code{list} object containing the ensemble forecast and the ensemble residuals
 #'
 #'@export
-ensemble_base = function(y_series, y_freq, lambda, k, bottom_series = FALSE){
+ensemble_base = function(y_series, y_freq, lambda = NULL, k, bottom_series = FALSE){
+
+  # Automatically set lambda if missing. If many zeros are present, use 0.7, which seems to give
+  # good stability and balances overconfidence of prediction intervals. Otherwise use 1, which does not
+  # transform the series but shifts it by -1 (https://otexts.com/fpp2/transformations.html)
+  if(missing(lambda)){
+    lambda <- ifelse((length(which(y_series == 0)) / length(y_series)) > 0.1, 0.7, 1)
+  }
+
+ lambda <- ifelse(any(as.vector(y_series) == 0), max(c(0.7, lambda)), lambda)
+
+ if(!is.null(lambda)){
+   if(lambda < -1 || lambda > 2) stop('lambda must be between -1 and 2 inclusive')
+ }
 
   # If enough observations exist, split into training and testing data
   if(length(y_series) >= (y_freq * 4)){
@@ -85,7 +98,7 @@ for(i in seq_along(windows)){
 ewma_fc <- matrix(NA, nrow = length(y_test), ncol = ncol(ewma))
 for(i in 1:ncol(ewma)){
   # Add Gaussian noise to forecasted moving averages for better generalizability
-  ewma_fc[,i] <- jitter(forecast::forecast(ewma[,i], h = length(y_test))$mean, amount = 0.1)
+  ewma_fc[,i] <- jitter(forecast::forecast(ewma[,i], h = length(y_test))$mean, amount = 0.25)
 }
 
 arima_base <- try(forecast::forecast(forecast::auto.arima(y_train,
@@ -129,8 +142,8 @@ if(inherits(arima_base, 'try-error')){
 
 # Try an auto.arima model with four harmonic Fourier terms as regressors
 arimaf_base <- try(forecast::forecast(forecast::auto.arima(y_train,
-                                                           xreg = forecast::fourier(y_train, K = 4),
-                                                          lambda = lambda),
+                                                           lambda = lambda,
+                                                           xreg = forecast::fourier(y_train, K = 4)),
                                      h = length(y_test),
 
                                      # Add Gaussian noise to forecasted terms for better generalizability
@@ -145,8 +158,8 @@ if(inherits(arimaf_base, 'try-error')){
   if(cv){
     arimaf_mae <- abs(as.vector(arimaf_base$mean) - as.vector(y_test))
     arimaf_base <- forecast::forecast(forecast::auto.arima(y_series,
-                                                           xreg = forecast::fourier(y_series, K = 4),
-                                                           lambda = lambda),
+                                                           lambda = lambda,
+                                                           xreg = forecast::fourier(y_series, K = 4)),
                                       h = y_freq * k,
                                       xreg = jitter(forecast::fourier(y_series, K = 4, h = y_freq * k),
                                                     amount = 0.1))
@@ -159,7 +172,8 @@ if(inherits(arimaf_base, 'try-error')){
 # Try an STLM with arima on the seasonally adjusted series model
 stlmar_base <- try(forecast::forecast(forecast::stlm(y_train,
                                                      method = 'arima',
-                                                     lambda = lambda),
+                                                     lambda = lambda,
+                                                     s.window = 'periodic'),
                                      h = length(y_test)),
                   silent = TRUE)
 if(inherits(stlmar_base, 'try-error')){
@@ -171,7 +185,7 @@ if(inherits(stlmar_base, 'try-error')){
     stlmar_mae <- abs(as.vector(stlmar_base$mean) - as.vector(y_test))
     stlmar_base <- forecast::forecast(forecast::stlm(y_series,
                                                          method = 'arima',
-                                                         lambda = lambda),
+                                                     s.window = 'periodic'),
                                           h = y_freq * k)
   } else {
     stlmar_mae <- tail(as.vector(abs(residuals(stlmar_base))), length(y_test))
@@ -181,7 +195,8 @@ if(inherits(stlmar_base, 'try-error')){
 # Try a TBATS model
 tbats_base <- try(forecast::forecast(forecast::tbats(y_train,
                                                  lambda = lambda),
-                                   h = length(y_test)),
+                                   h = length(y_test),
+                                   lambda = lambda),
                 silent = TRUE)
 if(inherits(tbats_base, 'try-error')){
   use_tbats <- FALSE
@@ -192,7 +207,8 @@ if(inherits(tbats_base, 'try-error')){
     tbats_mae <- abs(as.vector(tbats_base$mean) - as.vector(y_test))
     tbats_base <- forecast::forecast(forecast::tbats(y_series,
                                                          lambda = lambda),
-                                         h = y_freq * k)
+                                         h = y_freq * k,
+                                     lambda = lambda)
   } else {
     tbats_mae <- tail(as.vector(abs(residuals(tbats_base))), length(y_test))
   }
@@ -209,7 +225,8 @@ if(y_freq <= 24){
 } else {
   ets_base <- try(forecast::forecast(forecast::stlf(y_train,
                                                    lambda = lambda),
-                                     h = length(y_test)),
+                                     h = length(y_test),
+                                     lambda = lambda),
                   silent = TRUE)
 }
 
@@ -218,17 +235,25 @@ if(inherits(ets_base, 'try-error')){
   ets_mae <- rep(NA, length(y_test))
 } else {
   use_ets <- TRUE
+  # Bagged models only return full prediction intervals, but we need a two-column object
+  # for intervals when ensembling
+  ets_base$upper <- cbind(ets_base$upper, ets_base$upper)
+  ets_base$lower <- cbind(ets_base$lower, ets_base$lower)
   if(cv){
     ets_mae <- abs(as.vector(ets_base$mean) - as.vector(y_test))
     if(y_freq <= 24){
       ets_base <- forecast::forecast(forecast::baggedETS(y_series,
                                                          bootstrapped_series = forecast::bld.mbb.bootstrap(y_series, 20),
                                                          lambda = lambda),
-                                         h = y_freq * k, lambda = lambda)
+                                         h = y_freq * k,
+                                     lambda = lambda)
     } else {
       ets_base <- forecast::forecast(forecast::stlf(y_series,
                                                    lambda = lambda),
-                                     h = y_freq * k)
+                                     h = y_freq * k,
+                                     lambda = lambda)
+      ets_base$upper <- cbind(ets_base$upper, ets_base$upper)
+      ets_base$lower <- cbind(ets_base$lower, ets_base$lower)
     }
   } else {
     ets_mae <- tail(as.vector(abs(residuals(ets_base))), length(y_test))
@@ -236,7 +261,7 @@ if(inherits(ets_base, 'try-error')){
 }
 
 # Try a naive model
-naive_base <- try(forecast::naive(y_train, lambda = lambda,
+naive_base <- try(forecast::naive(y_train,
                                    h = length(y_test)),
                 silent = TRUE)
 if(inherits(naive_base, 'try-error')){
@@ -246,7 +271,7 @@ if(inherits(naive_base, 'try-error')){
   use_naive <- TRUE
   if(cv){
     naive_mae <- abs(as.vector(naive_base$mean) - as.vector(y_test))
-    naive_base <- forecast::naive(y_series, lambda = lambda,
+    naive_base <- forecast::naive(y_series,
                                       h = y_freq * k)
   } else {
     naive_mae <- tail(as.vector(abs(residuals(naive_base))), length(y_test))
@@ -255,7 +280,6 @@ if(inherits(naive_base, 'try-error')){
 
 # Try an rwf model
 rwf_base <- try(forecast::rwf(y_train,
-                              lambda = lambda,
                               drift = TRUE,
                               h = length(y_test)),
                   silent = TRUE)
@@ -267,7 +291,6 @@ if(inherits(rwf_base, 'try-error')){
   if(cv){
     rwf_mae <- abs(as.vector(rwf_base$mean) - as.vector(y_test))
     rwf_base <- forecast::rwf(y_series,
-                                  lambda = lambda,
                                   drift = TRUE,
                                   h = y_freq * k)
   } else {
@@ -277,7 +300,6 @@ if(inherits(rwf_base, 'try-error')){
 
 # Try an snaive model
 snaive_base <- try(forecast::snaive(y_train,
-                                  lambda = lambda,
                                   h = length(y_test)),
                   silent = TRUE)
 if(inherits(snaive_base, 'try-error')){
@@ -288,7 +310,6 @@ if(inherits(snaive_base, 'try-error')){
   if(cv){
     snaive_mae <- abs(as.vector(snaive_base$mean) - as.vector(y_test))
     snaive_base <- forecast::snaive(y_series,
-                                        lambda = lambda,
                                         h = y_freq * k)
   } else {
     snaive_mae <- tail(as.vector(abs(residuals(snaive_base))), length(y_test))

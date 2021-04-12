@@ -9,8 +9,9 @@
 #'@param y \code{xts matrix}. The outcome series to be modelled. \code{NAs} are currently not supported
 #'@param k \code{integer} specifying the length of the forecast horizon in multiples of \code{frequency}. Default
 #'is \code{1}, meaning that a final forecast of \code{frequency} horizons will be returned
-#'@param lambda \code{numeric proportional}. The Box Cox power transformation parameter for all series. Must be
-#'between \code{0} and \code{1} inclusive
+#'@param lambda \code{numeric}. The Box Cox power transformation parameter for all series. Must be
+#'between \code{-1} and \code{2} inclusive. If \code{y_series} contains zeros, \code{lambda} will be set to
+#'\code{max(c(0.7, lambda))} to ensure stability of forecasts
 #'@param frequency \code{integer}. The seasonal frequency in \code{y}
 #'@param horizon \code{integer}. The horizon to forecast. Defaults to \code{frequency}
 #'@param cores \code{integer}. The number of cores to use. This is used to initialize the states of each series
@@ -52,7 +53,7 @@
 #'
 thief_ensemble = function(y,
                       k = 1,
-                      lambda = 1,
+                      lambda = NULL,
                       frequency = 52,
                       horizon = NULL,
                       cores = parallel::detectCores() - 1){
@@ -63,14 +64,25 @@ thief_ensemble = function(y,
   }
 
   n <- NCOL(y)
+  if(n > 1){
   ynames <- colnames(y)
   if(is.null(ynames)) {
     colnames(y) <- paste0("Series", 1:n)
     ynames <- colnames(y)
   }
+  }
+
+  # Automatically set lambda if missing. If many zeros are present in the bottom series, use 0.5, which gives
+  # good stability and balances overconfidence of prediction intervals. Otherwise use 1, which does not
+  # transform the series but shifts it by -1 (https://otexts.com/fpp2/transformations.html)
+  if(missing(lambda)){
+    lambda <- ifelse((length(which(y[,1] == 0)) / length(y[,1])) > 0.1, 0.7, 1)
+  }
+
+  lambda <- ifelse(any(as.vector(y[,1]) == 0), max(c(0.7, lambda)), lambda)
 
   if(!is.null(lambda)){
-    if(lambda < 0 || lambda > 1) stop('lambda must be between 0 and 1 inclusive')
+    if(lambda < -1 || lambda > 2) stop('lambda must be between -1 and 2 inclusive')
   }
 
   # Set forecast horizon if missing
@@ -102,7 +114,11 @@ thief_ensemble = function(y,
   # Put aggregated ys back together for automatic univariate forecasting
   outcomes <- lapply(seq_along(tsagg[[1]]), function(x){
       series <- do.call(cbind, lapply(tsagg, '[[', x))
-      colnames(series) <- colnames(y)
+      if(n > 1){
+        colnames(series) <- colnames(y)
+      } else {
+        series <- cbind(series, rep(NA, length(series)))
+      }
     series
   })
 
@@ -121,7 +137,7 @@ thief_ensemble = function(y,
 
       # Use automatic forecasting to get best possible result
       cat('\nFitting ensemble forecasts to series at frequency', frequencies[i], '\n')
-      for(j in seq_len(ncol(y))){
+      for(j in seq_len(NCOL(y))){
 
           ensemble <- try(suppressWarnings(ensemble_base(y_series = outcomes[[i]][,j],
                                     lambda = lambda,
@@ -131,10 +147,8 @@ thief_ensemble = function(y,
 
           if(inherits(ensemble, 'try-error')){
             base[[i]][[j]] <- forecast::forecast(outcomes[[i]][,j],
-                                                 lambda = lambda,
                                                  h = k * frequencies[i])
             residuals[[i]][[j]] <- residuals(forecast::forecast(outcomes[[i]][,j],
-                                                                lambda = lambda,
                                                                 h = k * frequencies[i]))
 
           } else {
@@ -163,7 +177,7 @@ thief_ensemble = function(y,
              amount = 0.001)
     })
 
-    if(!is.null(lambda)){
+    if(!any(y < 0)){
       series_reconciled <- try(suppressWarnings(reconcilethief_nonneg(forecasts = series_base,
                                                                   residuals = series_resids,
                                                                   comb = 'sam')),
@@ -201,7 +215,7 @@ thief_ensemble = function(y,
     adjustment <- as.numeric(reconciled[[series]]$mean - base[[1]][[series]]$mean)
 
     new_distribution <- orig_distribution + adjustment
-    if(!is.null(lambda)){
+    if(!any(y < 0)){
       new_distribution[new_distribution < 0] <- 0
     }
 

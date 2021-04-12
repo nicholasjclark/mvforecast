@@ -30,8 +30,8 @@
 #'possible to have group wise pooling. For instance 2 variables sharing one pooled estimates,
 #'and 3 other variables sharing another grouped estimate would have values of (2,2,3,3,3).
 #'The index for group wise pooling starts at 2 and should be incremented for each new group added. Defaults to \code{NULL}
-#'@param lambda \code{numeric proportional}. The Box Cox power transformation parameter for all series. Must be
-#'between \code{0} and \code{1} inclusive
+#'@param lambda \code{numeric proportional}. The multivariate Box Cox power transformation parameter for all series.
+#'Must be between \code{0} and \code{1.5} inclusive
 #'@param frequency \code{integer}. The seasonal frequency in \code{y}
 #'@param horizon \code{integer}. The horizon to forecast. Defaults to \code{frequency}
 #'@param dependence \code{character}. The multivariate error dependence structure to impose. Options are:
@@ -171,7 +171,7 @@ thief_vets = function(y,
   }
 
   if(!is.null(lambda)){
-    if(lambda < 0 || lambda > 1) stop('lambda must be between 0 and 1 inclusive')
+    if(lambda < 0 || lambda > 1.5) stop('lambda must be between 0 and 1.5 inclusive')
   }
 
   # Set forecast horizon if missing
@@ -474,16 +474,13 @@ thief_vets = function(y,
       for(j in seq_len(ncol(y))){
 
           ensemble <- try(suppressWarnings(ensemble_base(y_series = outcomes[[i]][,j],
-                                    lambda = lambda,
                                     y_freq = frequencies[i],
                                     k = k)), silent = TRUE)
 
           if(inherits(ensemble, 'try-error')){
             base[[i]][[j]] <- forecast::forecast(outcomes[[i]][,j],
-                                                 lambda = lambda,
                                                  h = k * frequencies[i])
             residuals[[i]][[j]] <- residuals(forecast::forecast(outcomes[[i]][,j],
-                                                                lambda = lambda,
                                                                 h = k * frequencies[i]))
 
           } else {
@@ -514,7 +511,7 @@ thief_vets = function(y,
              amount = 0.001)
     })
 
-    if(!is.null(lambda)){
+    if(!any(y < 0)){
       series_reconciled <- try(suppressWarnings(reconcilethief_nonneg(forecasts = series_base,
                                                                   residuals = series_resids,
                                                                   comb = 'sam')),
@@ -546,7 +543,7 @@ thief_vets = function(y,
     adjustment <- as.numeric(reconciled[[series]] - base[[1]][[series]]$mean)
 
     new_distribution <- orig_distrubions[[series]] + adjustment
-    if(!is.null(lambda)){
+    if(!any(y < 0)){
       new_distribution[new_distribution < 0] <- 0
     }
 

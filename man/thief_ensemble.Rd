@@ -7,7 +7,7 @@
 thief_ensemble(
   y,
   k = 1,
-  lambda = 1,
+  lambda = NULL,
   frequency = 52,
   horizon = NULL,
   cores = parallel::detectCores() - 1
@@ -19,8 +19,9 @@ thief_ensemble(
 \item{k}{\code{integer} specifying the length of the forecast horizon in multiples of \code{frequency}. Default
 is \code{1}, meaning that a final forecast of \code{frequency} horizons will be returned}
 
-\item{lambda}{\code{numeric proportional}. The Box Cox power transformation parameter for all series. Must be
-between \code{0} and \code{1} inclusive}
+\item{lambda}{\code{numeric}. The Box Cox power transformation parameter for all series. Must be
+between \code{-1} and \code{2} inclusive. If \code{y_series} contains zeros, \code{lambda} will be set to
+\code{max(c(0.7, lambda))} to ensure stability of forecasts}
 
 \item{frequency}{\code{integer}. The seasonal frequency in \code{y}}
 
