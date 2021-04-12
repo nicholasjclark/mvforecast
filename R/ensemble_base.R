@@ -98,7 +98,8 @@ for(i in seq_along(windows)){
 ewma_fc <- matrix(NA, nrow = length(y_test), ncol = ncol(ewma))
 for(i in 1:ncol(ewma)){
   # Add Gaussian noise to forecasted moving averages for better generalizability
-  ewma_fc[,i] <- jitter(forecast::forecast(ewma[,i], h = length(y_test))$mean, amount = 0.25)
+  ewma_fc[,i] <- jitter(forecast::forecast(ts(ewma[,i],
+                                              frequency = y_freq), h = length(y_test))$mean, amount = 0.25)
 }
 
 arima_base <- try(forecast::forecast(forecast::auto.arima(y_train,

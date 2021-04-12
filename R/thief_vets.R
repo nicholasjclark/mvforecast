@@ -334,11 +334,11 @@ thief_vets = function(y,
           prediction <- t(as.matrix(p$prediction_table$Predicted[[series]]$distribution))
           prediction_null <- t(as.matrix(p_null$prediction_table$Predicted[[series]]$distribution))
 
-          if(nrow(prediction_null > nrow(prediction))){
+          if(nrow(prediction_null) > nrow(prediction)){
             prediction <- rbind(prediction, prediction_null[(nrow(prediction) + 1):nrow(prediction_null),])
           }
 
-          if(!is.null(lambda)){
+          if(!any(y < 0)){
             prediction[prediction < 0] <- 0
           }
 
@@ -417,7 +417,7 @@ thief_vets = function(y,
         series_forecasts <- lapply(seq_len(ncol(y)), function(series){
           prediction <- t(as.matrix(p_null$prediction_table$Predicted[[series]]$distribution))
 
-          if(!is.null(lambda)){
+          if(!any(y < 0)){
             prediction[prediction < 0] <- 0
           }
 
