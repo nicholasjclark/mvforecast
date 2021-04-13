@@ -493,7 +493,7 @@ thief_vets = function(y,
     }
   }
 
-  # Reconcile the forecasts, use non-negative optimisation constraints if lambda is supplied
+  # Reconcile the forecasts, use non-negative optimisation constraints if there are no negatives present in y
   cat('\nReconciling original forecasts')
   reconciled <- lapply(seq_len(ncol(y)), function(series){
     series_base <- lapply(seq_along(outcomes), function(x){

@@ -25,8 +25,8 @@
 #'@details Series in \code{y} are aggregated at all possible levels up to annual using \code{\link[thief]{tsaggregates}}.
 #'\code{\link{ensemble_base}} is used on all levels of aggregation to find a weighted ensemble of nine
 #'univariate forecast models that minimises mean absolute scaled error. Forecasts are then reconciled
-#'using \code{\link[thief]{reconcilethief}} and are optionally constrained using non-negative optimisation if \code{lambda}
-#'is provided. Adjustments to the original unaggregated forecast are incorporated and a distribution of \code{1000} sample
+#'using \code{\link[thief]{reconcilethief}} and are optionally constrained using non-negative optimisation if there are no
+#'negative values in \code{y}. Adjustments to the original unaggregated forecast are incorporated and a distribution of \code{1000} sample
 #'paths for each series' forecast are returned
 #'
 #'@references Athanasopoulos, G., Hyndman, R.,  Kourentzes, N.,  and Petropoulos, F. Forecasting with temporal hierarchies.
@@ -72,7 +72,7 @@ thief_ensemble = function(y,
   }
   }
 
-  # Automatically set lambda if missing. If many zeros are present in the bottom series, use 0.5, which gives
+  # Automatically set lambda if missing. If many zeros are present in the bottom series, use 0.7, which gives
   # good stability and balances overconfidence of prediction intervals. Otherwise use 1, which does not
   # transform the series but shifts it by -1 (https://otexts.com/fpp2/transformations.html)
   if(missing(lambda)){
@@ -159,7 +159,7 @@ thief_ensemble = function(y,
       }
   }
 
-  # Reconcile the forecasts, use non-negative optimisation constraints if lambda is supplied
+  # Reconcile the forecasts, use non-negative optimisation constraints if there are no negatives present in y
   cat('\nReconciling original forecasts')
   reconciled <- lapply(seq_len(ncol(y)), function(series){
     series_base <- lapply(seq_along(outcomes), function(x){
