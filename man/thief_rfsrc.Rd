@@ -11,7 +11,7 @@ thief_rfsrc(
   frequency = 52,
   horizon = NULL,
   predict_quantiles = TRUE,
-  cores = parallel::detectCores() - 1
+  cores = 1
 )
 }
 \arguments{
@@ -31,8 +31,7 @@ between \code{-1} and \code{2} inclusive. If \code{y_series} contains zeros, \co
 \item{predict_quantiles}{\code{logical}. If \code{TRUE}, \code{\link[randomForestSRC]{quantreg.rfsrc}} is used
 to train the multivariate random forest using quantile loss to predict uncertainty intervals}
 
-\item{cores}{\code{integer}. The number of cores to use. This is used to initialize the states of each series
-using \code{\link[tsets]{ets_modelspec}}}
+\item{cores}{\code{integer}. The number of cores to use}
 }
 \value{
 A \code{list} containing the reconciled forecast distributions for each series in \code{y}. Each element in

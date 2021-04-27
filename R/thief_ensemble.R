@@ -3,7 +3,7 @@
 #'This function fits ensemble univariate forecast models on all levels of temporal
 #'aggregation for a multivariate xts timeseries object
 #'
-#'@importFrom parallel detectCores
+#'@importFrom parallel detectCores parLapply makePSOCKcluster setDefaultCluster clusterExport clusterEvalQ stopCluster
 #'@importFrom stats ts end start frequency
 #'
 #'@param y \code{xts matrix}. The outcome series to be modelled. \code{NAs} are currently not supported
@@ -123,16 +123,63 @@ thief_ensemble = function(y,
   })
 
   # Create objects for storing forecasts and residuals
-  base <- list()
-  residuals <- list()
+  base <- vector("list", length(outcomes))
+  residuals <- vector("list", length(outcomes))
   for(i in seq_along(outcomes)){
-    base[[i]] <- list()
-    residuals[[i]] <- list()
+    base[[i]] <- vector("list", NCOL(y))
+    residuals[[i]] <- vector("list", NCOL(y))
   }
 
   # Compute base forecasts using an VETS model if frequency is >= multi_freq, otherwise
   # use automatic forecasting from the forecast package to choose the most appropriate univariate model
-  frequencies <- as.numeric(unlist(lapply(tsagg[[1]], frequency)))
+  frequencies <- as.numeric(unlist(lapply(tsagg[[1]], frequency), use.names = FALSE))
+
+  if(cores > 1){
+    cl <- makePSOCKcluster(cores)
+    setDefaultCluster(cl)
+    clusterExport(NULL, c('frequencies',
+                          'outcomes',
+                          'lambda',
+                          'k',
+                          'y'),
+                  envir = environment())
+    clusterEvalQ(cl, library(forecast))
+    clusterEvalQ(cl, library(zoo))
+    clusterEvalQ(cl, library(xts))
+
+    cat('\nFitting ensemble forecasts to all series using', cores, 'cores\n')
+    ensemble_list <- parLapply(cl, seq_along(outcomes), function(i){
+      outcome_base <- list()
+      outcome_residuals <- list()
+      for(j in seq_len(NCOL(y))){
+
+        ensemble <- try(suppressWarnings(ensemble_base(y_series = outcomes[[i]][,j],
+                                                       lambda = lambda,
+                                                       y_freq = frequencies[i],
+                                                       k = k,
+                                                       bottom_series = ifelse(i == 1, TRUE, FALSE))), silent = TRUE)
+
+        if(inherits(ensemble, 'try-error')){
+          outcome_base[[j]] <- forecast::forecast(outcomes[[i]][,j],
+                                               h = k * frequencies[i])
+          outcome_residuals[[j]] <- residuals(forecast::forecast(outcomes[[i]][,j],
+                                                              h = k * frequencies[i]))
+
+        } else {
+          outcome_base[[j]] <- ensemble[[1]]
+          outcome_residuals[[j]] <- ensemble[[2]]
+        }
+
+      }
+      list(outcome_base = outcome_base, outcome_residuals = outcome_residuals)
+    })
+    stopCluster(cl)
+    base <- purrr::map(ensemble_list, 'outcome_base')
+    residuals <- purrr::map(ensemble_list, 'outcome_residuals')
+    rm(ensemble_list)
+
+  } else {
+
   for(i in seq_along(outcomes)){
 
       # Use automatic forecasting to get best possible result
@@ -157,6 +204,7 @@ thief_ensemble = function(y,
           }
 
       }
+  }
   }
 
   # Reconcile the forecasts, use non-negative optimisation constraints if there are no negatives present in y
@@ -189,12 +237,12 @@ thief_ensemble = function(y,
       }
 
     } else {
-      series_reconciled <- try(suppressWarnings(reconcilethief(forecasts = series_base,
+      series_reconciled <- try(suppressWarnings(thief::reconcilethief(forecasts = series_base,
                                                                residuals = series_resids,
                                                                comb = 'sam')),
                                silent = T)
       if(inherits(series_reconciled, 'try-error')){
-        series_reconciled <- suppressWarnings(reconcilethief(forecasts = series_base,
+        series_reconciled <- suppressWarnings(thief::reconcilethief(forecasts = series_base,
                                                              residuals = series_resids,
                                                              comb = 'struc'))
       }

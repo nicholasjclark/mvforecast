@@ -3,7 +3,7 @@
 #'This function fits multivariate Breiman random forests on a multivariate xts timeseries object and then
 #'uses ensemble univariate forecast models on all higher levels of temporal aggregation to reconcile the forecasts
 #'
-#'@importFrom parallel detectCores
+#'@importFrom parallel detectCores parLapply makePSOCKcluster setDefaultCluster clusterExport clusterEvalQ stopCluster
 #'@importFrom stats ts end start frequency
 #'
 #'@param y \code{xts matrix}. The outcome series to be modelled. \code{NAs} are currently not supported
@@ -14,8 +14,7 @@
 #'\code{max(c(0.7, lambda))} to ensure stability of forecasts
 #'@param frequency \code{integer}. The seasonal frequency in \code{y}
 #'@param horizon \code{integer}. The horizon to forecast. Defaults to \code{frequency}
-#'@param cores \code{integer}. The number of cores to use. This is used to initialize the states of each series
-#'using \code{\link[tsets]{ets_modelspec}}
+#'@param cores \code{integer}. The number of cores to use
 #'@param predict_quantiles \code{logical}. If \code{TRUE}, \code{\link[randomForestSRC]{quantreg.rfsrc}} is used
 #'to train the multivariate random forest using quantile loss to predict uncertainty intervals
 #'@return A \code{list} containing the reconciled forecast distributions for each series in \code{y}. Each element in
@@ -62,7 +61,7 @@ thief_rfsrc = function(y,
                        frequency = 52,
                        horizon = NULL,
                        predict_quantiles = TRUE,
-                       cores = parallel::detectCores() - 1){
+                       cores = 1){
 
   # Check variables
   if(!xts::is.xts(y)){
@@ -129,22 +128,19 @@ thief_rfsrc = function(y,
   })
 
   # Create objects for storing forecasts and residuals
-  base <- list()
-  residuals <- list()
+  base <- vector("list", length(outcomes))
+  residuals <- vector("list", length(outcomes))
   for(i in seq_along(outcomes)){
-    base[[i]] <- list()
-    residuals[[i]] <- list()
+    base[[i]] <- vector("list", NCOL(y))
+    residuals[[i]] <- vector("list", NCOL(y))
   }
 
   # Compute base forecasts using an VETS model if frequency is >= multi_freq, otherwise
   # use automatic forecasting from the forecast package to choose the most appropriate univariate model
-  frequencies <- as.numeric(unlist(lapply(tsagg[[1]], frequency)))
-  for(i in seq_along(outcomes)){
-
+  frequencies <- as.numeric(unlist(lapply(tsagg[[1]], frequency), use.names = FALSE))
     # Use rfsrc on the base (unaggregated) series
-    if(i == 1){
 
-      cat('\nFitting a rfsrc model to series with frequency', frequencies[i],'\n')
+      cat('\nFitting a rfsrc model to series with frequency', frequency,'\n')
 
       # Get a dataframe of the series
       rf_data <- data.frame(y)
@@ -186,7 +182,7 @@ thief_rfsrc = function(y,
 
       # Store residuals
       for(j in 1:NCOL(y)){
-        residuals[[i]][[j]] <- rf$regrOutput[[j]]$predicted - as.vector(y[,j])
+        residuals[[1]][[j]] <- rf$regrOutput[[j]]$predicted - as.vector(y[,j])
       }
 
       # Generate forecasted ewmas for prediction
@@ -210,6 +206,7 @@ thief_rfsrc = function(y,
                                                   nodesize = 12)
         preds_quantiles <- randomForestSRC::quantreg(object = rf_quantiles , newdata = newdata)
         preds_quantiles <- purrr::map(preds_quantiles$quantreg, 'quantiles')
+        rm(rf_quantiles)
 
       } else {
         # Prediction using the mean forest
@@ -218,12 +215,13 @@ thief_rfsrc = function(y,
           do.call(cbind, purrr::map(preds$regrOutput, 'predicted'))
         })
       }
+      rm(newdata, rf_data, ewmas, ewma_fcs, rf)
 
       # Loop across series and calculate forecast prediction statistics for later reconciliation
       series_forecasts <- lapply(seq_len(ncol(y)), function(series){
         if(predict_quantiles){
           series_quantiles <- preds_quantiles[[series]]
-          forecast <- do.call(rbind, lapply(seq_len(nrow(prediction)), function(x){
+          forecast <- do.call(rbind, lapply(seq_len(horizon), function(x){
             quantiles <- c(series_quantiles[x,3], series_quantiles[x,10],
                            series_quantiles[x,50], series_quantiles[x,80],
                            series_quantiles[x,95])
@@ -235,7 +233,7 @@ thief_rfsrc = function(y,
           }))
 
           # Estimate the full distribution at each horizon
-          prediction <- do.call(rbind, lapply(seq_len(nrow(prediction)), function(x){
+          prediction <- do.call(rbind, lapply(seq_len(nrow(forecast)), function(x){
             fit <- density(series_quantiles[x,])
             rnorm(1000, sample(series_quantiles[x,], size = 1000, replace = TRUE), fit$bw)
           }))
@@ -249,7 +247,7 @@ thief_rfsrc = function(y,
             prediction[prediction < 0] <- 0
           }
 
-          forecast <- do.call(rbind, lapply(seq_len(nrow(prediction)), function(x){
+          forecast <- do.call(rbind, lapply(seq_len(horizon), function(x){
             pred_vals <- prediction[x, ]
             pred_vals <- pred_vals[!is.na(pred_vals)]
             ninetyfives <- suppressWarnings(hpd(pred_vals, 0.95))
@@ -286,50 +284,115 @@ thief_rfsrc = function(y,
       })
 
       # Store the original distributions from the base multivariate model for later adjusting
-      orig_distrubions <- purrr::map(series_forecasts, 'orig_distribution')
+      orig_distributions <- purrr::map(series_forecasts, 'orig_distribution')
 
       # Extract forecasts into the base list
       for(j in seq_len(ncol(y))){
-        base[[i]][[j]] <- series_forecasts[[j]]$base_forecast
+        base[[1]][[j]] <- .subset2(series_forecasts, j)$base_forecast
       }
 
-    } else {
+    # Use automatic forecasting on aggregated series, in parallel if possible
+      if(cores > 1){
+        cl <- makePSOCKcluster(cores)
+        setDefaultCluster(cl)
+        clusterExport(cl, c('frequencies',
+                              'outcomes',
+                              'lambda',
+                              'k',
+                              'y'),
+                      envir = environment())
+        clusterEvalQ(cl, library(forecast))
+        clusterEvalQ(cl, library(zoo))
+        clusterEvalQ(cl, library(xts))
 
-    # Use automatic forecasting to get best possible result
-    cat('\nFitting ensemble forecasts to series at frequency', frequencies[i], '\n')
-    for(j in seq_len(NCOL(y))){
+        cat('\nFitting ensemble forecasts to all remaining series using', cores, 'cores\n')
+        ensemble_list <- parLapply(cl, seq(2, length(outcomes)), function(i){
+          outcome_base <- vector("list", NCOL(y))
+          outcome_residuals <- vector("list", NCOL(y))
+          for(j in seq_len(NCOL(y))){
 
-      ensemble <- try(suppressWarnings(ensemble_base(y_series = outcomes[[i]][,j],
-                                                     lambda = lambda,
-                                                     y_freq = frequencies[i],
-                                                     k = k,
-                                                     bottom_series = ifelse(i == 1, TRUE, FALSE))), silent = TRUE)
+            ensemble <- tryCatch({
+              suppressWarnings(ensemble_base(y_series = .subset2(outcomes, i)[,j],
+                                             lambda = lambda,
+                                             y_freq = frequencies[i],
+                                             k = k,
+                                             bottom_series = FALSE))
+            }, error = function(e) {
+              'error'
+            })
 
-      if(inherits(ensemble, 'try-error')){
-        base[[i]][[j]] <- forecast::forecast(outcomes[[i]][,j],
-                                             h = k * frequencies[i])
-        residuals[[i]][[j]] <- residuals(forecast::forecast(outcomes[[i]][,j],
-                                                            h = k * frequencies[i]))
+            if(ensemble == 'error'){
+              rm(ensemble)
+              outcome_base[[j]] <- forecast::forecast(.subset2(outcomes, i)[,j],
+                                                      h = k * frequencies[i])
+              outcome_residuals[[j]] <- residuals(forecast::forecast(.subset2(outcomes, i)[,j],
+                                                                     h = k * frequencies[i]))
+
+            } else {
+              outcome_base[[j]] <- .subset2(ensemble, 1)
+              outcome_residuals[[j]] <- .subset2(ensemble, 2)
+              rm(ensemble)
+            }
+
+          }
+          list(outcome_base = outcome_base, outcome_residuals = outcome_residuals)
+        })
+        stopCluster(cl)
+
+        for(i in seq(2, length(outcomes))){
+          for(j in seq_len(NCOL(y))){
+            base[[i]][[j]] <- .subset2(ensemble_list, i-1)$outcome_base[[j]]
+          }
+        }
+
+        for(i in seq(2, length(outcomes))){
+          for(j in seq_len(NCOL(y))){
+            residuals[[i]][[j]] <- .subset2(ensemble_list, i-1)$outcome_residuals[[j]]
+          }
+        }
+        rm(ensemble_list)
 
       } else {
-        base[[i]][[j]] <- ensemble[[1]]
-        residuals[[i]][[j]] <- ensemble[[2]]
-      }
 
-    }
-  }
-  }
+        for(i in seq(2, length(outcomes))){
+          cat('\nFitting ensemble forecasts to series at frequency', frequencies[i], '\n')
+         for(j in seq_len(NCOL(y))){
+
+           ensemble <- tryCatch({
+             suppressWarnings(ensemble_base(y_series = .subset2(outcomes, i)[,j],
+                                            lambda = lambda,
+                                            y_freq = frequencies[i],
+                                            k = k,
+                                            bottom_series = ifelse(i == 1, TRUE, FALSE)))
+           }, error = function(e) {
+             'error'
+           })
+
+        if(ensemble == 'error'){
+          base[[i]][[j]] <- forecast::forecast(.subset2(outcomes, i)[,j],
+                                             h = k * frequencies[i])
+          residuals[[i]][[j]] <- residuals(forecast::forecast(.subset2(outcomes, i)[,j],
+                                                            h = k * frequencies[i]))
+
+        } else {
+          base[[i]][[j]] <- .subset2(ensemble, 1)
+          residuals[[i]][[j]] <- .subset2(ensemble, 2)
+        }
+
+      }
+        }
+      }
 
   # Reconcile the forecasts, use non-negative optimisation constraints if there are no negatives present in y
   cat('\nReconciling original forecasts')
   reconciled <- lapply(seq_len(ncol(y)), function(series){
     series_base <- lapply(seq_along(outcomes), function(x){
-      base[[x]][[series]]
+      .subset2(base, x)[[series]]
     })
     series_base <- lapply(seq_along(series_base), function(x){
       # In case any forecasts are constant, need to jitter so that covariances can be estimated
       series_base[[x]]$mean <- jitter(series_base[[x]]$mean, amount = 0.001)
-      series_base[[x]]
+      ts(series_base[[x]]$mean, frequency = frequencies[x])
     })
     series_resids <- lapply(seq_along(outcomes), function(x){
       orig_resids <- as.vector(residuals[[x]][[series]])
@@ -350,26 +413,26 @@ thief_rfsrc = function(y,
       }
 
     } else {
-      series_reconciled <- try(suppressWarnings(reconcilethief(forecasts = series_base,
+      series_reconciled <- try(suppressWarnings(thief::reconcilethief(forecasts = series_base,
                                                                residuals = series_resids,
                                                                comb = 'sam')),
                                silent = T)
       if(inherits(series_reconciled, 'try-error')){
-        series_reconciled <- suppressWarnings(reconcilethief(forecasts = series_base,
+        series_reconciled <- suppressWarnings(thief::reconcilethief(forecasts = series_base,
                                                              residuals = series_resids,
                                                              comb = 'struc'))
       }
     }
 
     # Return reconciled forecast for the lowest level of aggregation
-    series_reconciled[[1]]$mean
+    .subset2(series_reconciled, 1)
   })
 
   # Adjust original distributions using the reconciliation adjustment factors
   adjusted_distributions <- lapply(seq_len(ncol(y)), function(series){
-    adjustment <- as.numeric(reconciled[[series]] - base[[1]][[series]]$mean)
+    adjustment <- as.numeric(reconciled[[series]] - ts(base[[1]][[series]]$mean, frequency = frequency))
 
-    new_distribution <- orig_distrubions[[series]] + adjustment
+    new_distribution <- orig_distributions[[series]] + adjustment
     if(!any(y < 0)){
       new_distribution[new_distribution < 0] <- 0
     }

@@ -6,6 +6,7 @@
 #'similar to those returned by \code{\link{thief_vets}}
 #'@param main \code{character}. Optional label for the plot
 #'@param ylab \code{character}. Optional label for the y axis
+#'@param ylim Limits for the y-axis. Default is \code{c(min(simulation, na.rm = T), max(simulation, na.rm = T))}
 #'
 #'@details The sum of the CRPS is calculated against the test observations in \code{y_test} and returned. Calculations
 #'use the \code{\link[scoringRules]{crps_sample}} function
@@ -13,7 +14,8 @@
 #'@return A base plot of the forecast mean (black line) and 95 percent prediction intervals (red dashed lines)
 #'
 #'@export
-plot_mv_preds = function(simulation, main = '', ylab = 'Y'){
+plot_mv_preds = function(simulation, main = '', ylab = 'Y',
+                         ylim = c(min(simulation, na.rm = T), max(simulation, na.rm = T))){
 
   # Create an empty plot
   plot(as.vector(simulation[,1]), xlab = 'Horizon', main = main,

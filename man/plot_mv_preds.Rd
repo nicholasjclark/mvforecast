@@ -4,7 +4,12 @@
 \alias{plot_mv_preds}
 \title{Plot simulation predictions from a reconciled VETS model}
 \usage{
-plot_mv_preds(simulation, main = "", ylab = "Y")
+plot_mv_preds(
+  simulation,
+  main = "",
+  ylab = "Y",
+  ylim = c(min(simulation, na.rm = T), max(simulation, na.rm = T))
+)
 }
 \arguments{
 \item{simulation}{\code{matrix}. The forecast object, which should be a horizon x simulation \code{matrix}
@@ -13,6 +18,8 @@ similar to those returned by \code{\link{thief_vets}}}
 \item{main}{\code{character}. Optional label for the plot}
 
 \item{ylab}{\code{character}. Optional label for the y axis}
+
+\item{ylim}{Limits for the y-axis. Default is \code{c(min(simulation, na.rm = T), max(simulation, na.rm = T))}}
 }
 \value{
 A base plot of the forecast mean (black line) and 95 percent prediction intervals (red dashed lines)

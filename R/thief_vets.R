@@ -274,18 +274,19 @@ thief_vets = function(y,
   }
 
   # Create objects for storing forecasts and residuals
-  base <- list()
-  residuals <- list()
+  base <- vector("list", length(outcomes))
+  residuals <- vector("list", length(outcomes))
   for(i in seq_along(outcomes)){
-    base[[i]] <- list()
-    residuals[[i]] <- list()
+    base[[i]] <- vector("list", NCOL(y))
+    residuals[[i]] <- vector("list", NCOL(y))
   }
 
   # Compute base forecasts using an VETS model if frequency is >= multi_freq, otherwise
   # use automatic forecasting from the forecast package to choose the most appropriate univariate model
-  frequencies <- as.numeric(unlist(lapply(tsagg[[1]], frequency)))
-  for(i in seq_along(outcomes)){
-    if(frequencies[i] >= multi_freq){
+  frequencies <- as.numeric(unlist(lapply(tsagg[[1]], frequency), use.names = FALSE))
+  vets_frequencies <- which(frequencies >= multi_freq)
+  nonvets_frequencies <- which(!frequencies >= multi_freq)
+  for(i in vets_frequencies){
 
       # If xreg supplied and frequency is large enough, fit a VETS model
       if(!is.null(xreg)){
@@ -347,7 +348,7 @@ thief_vets = function(y,
             pred_vals <- pred_vals[!is.na(pred_vals)]
             ninetyfives <- suppressWarnings(hpd(pred_vals, 0.95))
             eighties <- suppressWarnings(hpd(pred_vals, 0.8))
-            quantiles <- c(ninetyfives[1], eighties[1], mean(prediction[x, ]), eighties[3], ninetyfives[3])
+            quantiles <- c(ninetyfives[1], eighties[1], mean.default(prediction[x, ]), eighties[3], ninetyfives[3])
             quantiles
           }))
 
@@ -465,31 +466,87 @@ thief_vets = function(y,
         base[[i]][[j]] <- series_forecasts[[j]]$base_forecast
         residuals[[i]][[j]] <- series_forecasts[[j]]$residuals
       }
+  }
 
+  if(cores > 1){
+    cl <- makePSOCKcluster(cores)
+    setDefaultCluster(cl)
+    clusterExport(NULL, c('nonvets_frequencies',
+                          'outcomes',
+                          'lambda',
+                          'k',
+                          'y'),
+                  envir = environment())
+    clusterEvalQ(cl, library(forecast))
+    clusterEvalQ(cl, library(zoo))
+    clusterEvalQ(cl, library(xts))
 
-    } else {
+    cat('\nFitting ensemble forecasts to all remaining series using', cores, 'cores\n')
+    ensemble_list <- parLapply(cl, nonvets_frequencies, function(i){
+      outcome_base <- list()
+      outcome_residuals <- list()
+      for(j in seq_len(NCOL(y))){
 
-      # For higher levels of aggregation, use automatic forecasting to get best possible result
-      cat('\nFitting ensemble forecasts to series at frequency', frequencies[i], '\n')
-      for(j in seq_len(ncol(y))){
+        ensemble <- try(suppressWarnings(ensemble_base(y_series = outcomes[[i]][,j],
+                                                       lambda = lambda,
+                                                       y_freq = frequencies[i],
+                                                       k = k,
+                                                       bottom_series = ifelse(i == 1, TRUE, FALSE))), silent = TRUE)
 
-          ensemble <- try(suppressWarnings(ensemble_base(y_series = outcomes[[i]][,j],
-                                    y_freq = frequencies[i],
-                                    k = k)), silent = TRUE)
+        if(inherits(ensemble, 'try-error')){
+          outcome_base[[j]] <- forecast::forecast(outcomes[[i]][,j],
+                                                  h = k * frequencies[i])
+          outcome_residuals[[j]] <- residuals(forecast::forecast(outcomes[[i]][,j],
+                                                                 h = k * frequencies[i]))
 
-          if(inherits(ensemble, 'try-error')){
-            base[[i]][[j]] <- forecast::forecast(outcomes[[i]][,j],
-                                                 h = k * frequencies[i])
-            residuals[[i]][[j]] <- residuals(forecast::forecast(outcomes[[i]][,j],
-                                                                h = k * frequencies[i]))
-
-          } else {
-            base[[i]][[j]] <- ensemble[[1]]
-            residuals[[i]][[j]] <- ensemble[[2]]
-          }
+        } else {
+          outcome_base[[j]] <- ensemble[[1]]
+          outcome_residuals[[j]] <- ensemble[[2]]
+        }
 
       }
+      list(outcome_base = outcome_base, outcome_residuals = outcome_residuals)
+    })
+    stopCluster(cl)
+    for(i in nonvets_frequencies){
+      for(j in seq_len(NCOL(y))){
+        base[[i]][[j]] <- .subset2(ensemble_list, i - max(vets_frequencies))$outcome_base[[j]]
+      }
+    }
 
+    for(i in nonvets_frequencies){
+      for(j in seq_len(NCOL(y))){
+        residuals[[i]][[j]] <- .subset2(ensemble_list, i - max(vets_frequencies))$outcome_residuals[[j]]
+      }
+    }
+    rm(ensemble_list)
+
+  } else {
+
+    for(i in nonvets_frequencies){
+
+      # Use automatic forecasting to get best possible result
+      cat('\nFitting ensemble forecasts to series at frequency', frequencies[i], '\n')
+      for(j in seq_len(NCOL(y))){
+
+        ensemble <- try(suppressWarnings(ensemble_base(y_series = outcomes[[i]][,j],
+                                                       lambda = lambda,
+                                                       y_freq = frequencies[i],
+                                                       k = k,
+                                                       bottom_series = ifelse(i == 1, TRUE, FALSE))), silent = TRUE)
+
+        if(inherits(ensemble, 'try-error')){
+          base[[i]][[j]] <- forecast::forecast(outcomes[[i]][,j],
+                                               h = k * frequencies[i])
+          residuals[[i]][[j]] <- residuals(forecast::forecast(outcomes[[i]][,j],
+                                                              h = k * frequencies[i]))
+
+        } else {
+          base[[i]][[j]] <- ensemble[[1]]
+          residuals[[i]][[j]] <- ensemble[[2]]
+        }
+
+      }
     }
   }
 
@@ -523,12 +580,12 @@ thief_vets = function(y,
       }
 
     } else {
-      series_reconciled <- try(suppressWarnings(reconcilethief(forecasts = series_base,
+      series_reconciled <- try(suppressWarnings(thief::reconcilethief(forecasts = series_base,
                                                                residuals = series_resids,
                                                                comb = 'sam')),
                                silent = T)
       if(inherits(series_reconciled, 'try-error')){
-        series_reconciled <- suppressWarnings(reconcilethief(forecasts = series_base,
+        series_reconciled <- suppressWarnings(thief::reconcilethief(forecasts = series_base,
                                                              residuals = series_resids,
                                                              comb = 'struc'))
       }

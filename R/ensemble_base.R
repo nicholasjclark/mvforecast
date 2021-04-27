@@ -88,7 +88,9 @@ ewma_filter <- function (x, ratio) {
 
 ewma <- matrix(NA, nrow = length(y_train), ncol = length(windows))
 for(i in seq_along(windows)){
-  ewma[,i] <- ewma_filter(as.vector(zoo::rollmean(y_train,
+  y_unique <- ts(y_train, start = 1, frequency = y_freq)
+
+  ewma[,i] <- ewma_filter(as.vector(zoo::rollmean(y_unique,
                                                   k = ceiling(windows[i] ^ 0.8),
                                                   na.pad = TRUE,
                                                   fill = 0)),
@@ -217,29 +219,30 @@ if(inherits(tbats_base, 'try-error')){
 
 # Try an ETS model
 if(y_freq <= 24){
-  ets_base <- try(forecast::forecast(forecast::baggedETS(y_train,
-                                                         bootstrapped_series = forecast::bld.mbb.bootstrap(y_train, 20),
-                                                         lambda = lambda),
-                                     h = length(y_test),
-                                     lambda = lambda),
-                  silent = TRUE)
+  ets_base <- tryCatch({
+    forecast::forecast(forecast::ets(y_train, lambda = lambda),
+                       h = length(y_test),
+                       lambda = lambda)
+  }, error = function(e) {
+    'error'
+  })
+
 } else {
-  ets_base <- try(forecast::forecast(forecast::stlf(y_train,
-                                                   lambda = lambda),
-                                     h = length(y_test),
-                                     lambda = lambda),
-                  silent = TRUE)
+  ets_base <- tryCatch({
+    forecast::forecast(forecast::stlf(y_train,
+                                      lambda = lambda),
+                       h = length(y_test),
+                       lambda = lambda)
+  }, error = function(e) {
+    'error'
+  })
 }
 
-if(inherits(ets_base, 'try-error')){
+if(ets_base == 'error'){
   use_ets <- FALSE
   ets_mae <- rep(NA, length(y_test))
 } else {
   use_ets <- TRUE
-  # Bagged models only return full prediction intervals, but we need a two-column object
-  # for intervals when ensembling
-  ets_base$upper <- cbind(ets_base$upper, ets_base$upper)
-  ets_base$lower <- cbind(ets_base$lower, ets_base$lower)
   if(cv){
     ets_mae <- abs(as.vector(ets_base$mean) - as.vector(y_test))
     if(y_freq <= 24){
@@ -356,9 +359,9 @@ maes <- maes + 1 / (snaive_mae + 1)
 
 # Define the function to minimise
 opt_mae <- function(weights, maes) {
-  mean(unlist(lapply(seq_len(nrow(maes)), function(h){
+  mean.default(unlist(lapply(seq_len(nrow(maes)), function(h){
     weighted.mean(maes[h,], weights)
-  })))
+  }), use.names = FALSE))
 }
 
 # Use optimisation to minimise the function
@@ -376,27 +379,32 @@ weight_fcs = function(fcs, ens_weights){
   means <- do.call(cbind, lapply(seq_along(fcs), function(x){
     as.vector(fcs[[x]]$mean)}))
   ens_mean <- unlist(lapply(seq_len(nrow(means)), function(x){
-    weighted.mean(means[x,], ens_weights)}))
+    weighted.mean(means[x,], ens_weights)}), use.names = F)
+  rm(means)
 
   upper_95s <- do.call(cbind, lapply(seq_along(fcs), function(x){
     as.vector(fcs[[x]]$upper[,2])}))
   ens_upper95 <- unlist(lapply(seq_len(nrow(upper_95s)), function(x){
-    weighted.mean(upper_95s[x,], ens_weights)}))
+    weighted.mean(upper_95s[x,], ens_weights)}), use.names = F)
+  rm(upper_95s)
 
   upper_80s <- do.call(cbind, lapply(seq_along(fcs), function(x){
     as.vector(fcs[[x]]$upper[,1])}))
   ens_upper80 <- unlist(lapply(seq_len(nrow(upper_80s)), function(x){
-    weighted.mean(upper_80s[x,], ens_weights)}))
+    weighted.mean(upper_80s[x,], ens_weights)}), use.names = F)
+  rm(upper_80s)
 
   lower_95s <- do.call(cbind, lapply(seq_along(fcs), function(x){
     as.vector(fcs[[x]]$lower[,2])}))
   ens_lower95 <- unlist(lapply(seq_len(nrow(lower_95s)), function(x){
-    weighted.mean(lower_95s[x,], ens_weights)}))
+    weighted.mean(lower_95s[x,], ens_weights)}), use.names = F)
+  rm(lower_95s)
 
   lower_80s <- do.call(cbind, lapply(seq_along(fcs), function(x){
     as.vector(fcs[[x]]$lower[,1])}))
   ens_lower80 <- unlist(lapply(seq_len(nrow(lower_80s)), function(x){
-    weighted.mean(lower_80s[x,], ens_weights)}))
+    weighted.mean(lower_80s[x,], ens_weights)}), use.names = F)
+  rm(lower_80s)
 
   ensemble_forecast <- fcs[[1]]
   ensemble_forecast$mean <- ts(ens_mean,
@@ -418,9 +426,11 @@ weight_fcs = function(fcs, ens_weights){
   fitted <- do.call(cbind, lapply(seq_along(fcs), function(x){
       as.vector(fcs[[x]]$fitted)
     }))
+  rm(fcs)
   ens_fitted <- unlist(lapply(seq_len(nrow(fitted)), function(x){
-    weighted.mean(fitted[x,], ens_weights)}))
+    weighted.mean(fitted[x,], ens_weights)}), use.names = F)
   residuals <- ens_fitted - y_series
+  residuals[is.na(residuals)] <- 0
 
   return(list(ensemble_forecast, residuals))
 }
@@ -452,7 +462,15 @@ if(!bottom_series){
 
 fcs <- fcs[names(fcs) %in% names(ens_weights)]
 ensemble <- weight_fcs(fcs = fcs, ens_weights = ens_weights)
+rm(fcs, ens_weights, maes,
+   theta_base,
+   stlmar_base,
+   tbats_base,
+   ets_base,
+   naive_base,
+   rwf_base,
+   snaive_base)
 
 # Return the ensemble forecast and residuals
-return(list(forecast = ensemble[[1]], residuals = ensemble[[2]]))
+return(list(forecast = .subset2(ensemble, 1), residuals = .subset2(ensemble, 2)))
 }
