@@ -231,9 +231,17 @@ thief_ensemble = function(y,
                                                                   comb = 'sam')),
                                silent = T)
       if(inherits(series_reconciled, 'try-error')){
-        series_reconciled <- suppressWarnings(reconcilethief_nonneg(forecasts = series_base,
+        series_reconciled <- try(suppressWarnings(reconcilethief_nonneg(forecasts = series_base,
                                                                         residuals = series_resids,
-                                                                        comb = 'struc'))
+                                                                        comb = 'struc')),
+                                 silent = T)
+      }
+
+      if(inherits(series_reconciled, 'try-error')){
+        series_reconciled <- try(suppressWarnings(reconcilethief(forecasts = series_base,
+                                                                 residuals = series_resids,
+                                                                 comb = 'struc')),
+                                 silent = T)
       }
 
     } else {
