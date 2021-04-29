@@ -222,7 +222,7 @@ thief_rfsrc = function(y,
       series_forecasts <- lapply(seq_len(ncol(y)), function(series){
         if(predict_quantiles){
           series_quantiles <- preds_quantiles[[series]]
-          forecast <- do.call(rbind, lapply(seq_len(horizon), function(x){
+          forecast <- do.call(rbind, lapply(seq_len(frequency * k), function(x){
             quantiles <- c(series_quantiles[x,3], series_quantiles[x,10],
                            series_quantiles[x,50], series_quantiles[x,80],
                            series_quantiles[x,95])
@@ -248,7 +248,7 @@ thief_rfsrc = function(y,
             prediction[prediction < 0] <- 0
           }
 
-          forecast <- do.call(rbind, lapply(seq_len(horizon), function(x){
+          forecast <- do.call(rbind, lapply(seq_len(frequency * k), function(x){
             pred_vals <- prediction[x, ]
             pred_vals <- pred_vals[!is.na(pred_vals)]
             ninetyfives <- suppressWarnings(hpd(pred_vals, 0.95))

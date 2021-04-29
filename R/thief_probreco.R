@@ -99,6 +99,15 @@ y_test <- y[(nrow(y) - prob_train_horizon + 1):nrow(y), ]
 y <- y[1:(nrow(y) - prob_train_horizon), ]
 
 # Fit the multivariate reconciled model for the base training series
+if(model == 'thief_rfsrc'){
+  cat('Fitting thief_rfsrc for the base series\n\n')
+  y_forecast_probs <- thief_rfsrc(y = y,
+                                  frequency = frequency,
+                                  k = ceiling(prob_train_horizon / frequency),
+                                  horizon = prob_train_horizon,
+                                  ...)
+}
+
 if(model == 'thief_vets'){
   cat('Fitting thief_vets for the base series\n\n')
   y_forecast_probs <- try(thief_vets(y = y,
@@ -122,7 +131,7 @@ if(model == 'thief_vets'){
 }
 
 if(model == 'thief_ensemble'){
-  cat('Fitting thief_vets for the base series\n\n')
+  cat('Fitting thief_ensemble for the base series\n\n')
   y_forecast_probs <- thief_ensemble(y = y,
                                      frequency = frequency,
                                      k = ceiling(prob_train_horizon / frequency),
@@ -203,6 +212,15 @@ if(missing(horizon)){
   horizon <- frequency
 }
 
+if(model == 'thief_rfsrc'){
+  cat('Fitting thief_rfsrc for the full base series\n\n')
+  y_forecast_probs <- thief_rfsrc(y = original_y,
+                                  frequency = frequency,
+                                  k = ceiling(horizon / frequency),
+                                  horizon = horizon,
+                                  ...)
+}
+
 if(model == 'thief_vets'){
   cat('Fitting thief_vets for the full base series\n\n')
   y_forecast_probs <- try(thief_vets(y = original_y,
@@ -225,7 +243,7 @@ if(model == 'thief_vets'){
 }
 
 if(model == 'thief_ensemble'){
-  cat('Fitting thief_vets for the full base series\n\n')
+  cat('Fitting thief_ensemble for the full base series\n\n')
   y_forecast_probs <- thief_ensemble(y = original_y,
                                      frequency = frequency,
                                      k = ceiling(horizon / frequency),
