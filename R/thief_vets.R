@@ -3,7 +3,7 @@
 #'This function fits vector exponential smoothing on the base level and optionally on
 #'higher levels of temporal aggregation for a multivariate xts timeseries object
 #'
-#'@importFrom parallel detectCores
+#'@importFrom parallel detectCores parLapply makePSOCKcluster setDefaultCluster clusterExport clusterEvalQ stopCluster
 #'@importFrom stats ts end start frequency
 #'
 #'@param y \code{xts matrix}. The outcome series to be modelled. \code{NAs} are currently not supported
@@ -110,7 +110,7 @@
 #' calc_crps(simulation = mod2, y_test = ixodes_vets_dat$y_test)
 #'
 #' # Plot one of the forecasts against the true values in the test set
-#' plot_vets_preds(simulation = mod2[[4]])
+#' plot_mv_preds(simulation = mod2[[4]])
 #' points(as.vector(ixodes_vets_dat$y_test[,4]))}
 #'
 #'@export
@@ -131,7 +131,7 @@ thief_vets = function(y,
                       xreg = NULL,
                       xreg_include = NULL,
                       newxreg = NULL,
-                      save_plots = TRUE,
+                      save_plots = FALSE,
                       fig_path = ''){
 
   # Check variables
@@ -581,7 +581,7 @@ thief_vets = function(y,
       }
 
       if(inherits(series_reconciled, 'try-error')){
-        series_reconciled <- try(suppressWarnings(reconcilethief(forecasts = series_base,
+        series_reconciled <- try(suppressWarnings(thief::reconcilethief(forecasts = series_base,
                                                                  residuals = series_resids,
                                                                  comb = 'struc')),
                                  silent = T)

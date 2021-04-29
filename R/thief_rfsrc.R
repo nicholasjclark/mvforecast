@@ -15,8 +15,9 @@
 #'@param frequency \code{integer}. The seasonal frequency in \code{y}
 #'@param horizon \code{integer}. The horizon to forecast. Defaults to \code{frequency}
 #'@param cores \code{integer}. The number of cores to use
-#'@param predict_quantiles \code{logical}. If \code{TRUE}, \code{\link[randomForestSRC]{quantreg.rfsrc}} is used
-#'to train the multivariate random forest using quantile loss to predict uncertainty intervals
+#'@param predict_quantiles \code{logical}. If \code{TRUE}, a \code{\link[randomForestSRC]{quantreg.rfsrc}} is used
+#'to train a second multivariate random forest using quantile loss to predict uncertainty intervals. If \code{FALSE},
+#'the distribution of estimates from the \code{2000} original random forests is used to estimate uncertainties
 #'@return A \code{list} containing the reconciled forecast distributions for each series in \code{y}. Each element in
 #'the \code{list} is a \code{horizon x 1000 matrix} of forecast predictions
 #'
@@ -41,7 +42,7 @@
 #'library(mvforecast)
 #'data("ixodes_vets_dat")
 #'
-#'#Fit a a thief_rfsrc model
+#'#Fit a thief_rfsrc model
 #'mod1 <- thief_rfsrc(y = ixodes_vets_dat$y_train,
 #'frequency = 52, k = 1,
 #'cores = parallel::detectCores() - 1)
@@ -50,7 +51,7 @@
 #'calc_crps(mod1, y_test = ixodes_vets_dat$y_test)
 #'
 #'Plot simulation results for one of the plots in the NEON dataset
-#'plot_vets_preds(simulation = mod1[[4]])
+#'plot_mv_preds(simulation = mod1[[4]])
 #'points(as.vector(ixodes_vets_dat$y_test[,4]))}
 #'
 #'@export
@@ -61,7 +62,7 @@ thief_rfsrc = function(y,
                        frequency = 52,
                        horizon = NULL,
                        predict_quantiles = TRUE,
-                       cores = 1){
+                       cores = parallel::detectCores() - 1){
 
   # Check variables
   if(!xts::is.xts(y)){
@@ -311,17 +312,14 @@ thief_rfsrc = function(y,
           outcome_residuals <- vector("list", NCOL(y))
           for(j in seq_len(NCOL(y))){
 
-            ensemble <- tryCatch({
+            ensemble <- try(
               suppressWarnings(ensemble_base(y_series = .subset2(outcomes, i)[,j],
                                              lambda = lambda,
                                              y_freq = frequencies[i],
                                              k = k,
-                                             bottom_series = FALSE))
-            }, error = function(e) {
-              'error'
-            })
+                                             bottom_series = FALSE)), silent = TRUE)
 
-            if(ensemble == 'error'){
+            if(inherits(ensemble, 'try-error')){
               rm(ensemble)
               outcome_base[[j]] <- forecast::forecast(.subset2(outcomes, i)[,j],
                                                       h = k * frequencies[i])
@@ -414,7 +412,7 @@ thief_rfsrc = function(y,
       }
 
       if(inherits(series_reconciled, 'try-error')){
-        series_reconciled <- try(suppressWarnings(reconcilethief(forecasts = series_base,
+        series_reconciled <- try(suppressWarnings(thief::reconcilethief(forecasts = series_base,
                                                                  residuals = series_resids,
                                                                  comb = 'struc')),
                                  silent = T)

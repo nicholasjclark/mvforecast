@@ -51,7 +51,7 @@ paths for each series' forecast are returned
 library(mvforecast)
 data("ixodes_vets_dat")
 
-#Fit a a thief_ensemble model
+#Fit a thief_ensemble model
 mod1 <- thief_ensemble(y = ixodes_vets_dat$y_train,
 frequency = 52, lambda = 1, k = 1,
 cores = parallel::detectCores() - 1)
@@ -60,7 +60,7 @@ cores = parallel::detectCores() - 1)
 calc_crps(mod1, y_test = ixodes_vets_dat$y_test)
 
 Plot simulation results for one of the plots in the NEON dataset
-plot_vets_preds(simulation = mod1[[4]])
+plot_mv_preds(simulation = mod1[[4]])
 points(as.vector(ixodes_vets_dat$y_test[,4]))}
 
 }

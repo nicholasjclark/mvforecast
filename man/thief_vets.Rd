@@ -21,7 +21,7 @@ thief_vets(
   xreg = NULL,
   xreg_include = NULL,
   newxreg = NULL,
-  save_plots = TRUE,
+  save_plots = FALSE,
   fig_path = ""
 )
 }
@@ -144,7 +144,7 @@ save_plots = FALSE)
 calc_crps(simulation = mod2, y_test = ixodes_vets_dat$y_test)
 
 # Plot one of the forecasts against the true values in the test set
-plot_vets_preds(simulation = mod2[[4]])
+plot_mv_preds(simulation = mod2[[4]])
 points(as.vector(ixodes_vets_dat$y_test[,4]))}
 
 }

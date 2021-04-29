@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_mv_preds.R
 \name{plot_mv_preds}
 \alias{plot_mv_preds}
-\title{Plot simulation predictions from a reconciled VETS model}
+\title{Plot simulation predictions from a reconciled thief model}
 \usage{
 plot_mv_preds(
   simulation,
@@ -22,12 +22,12 @@ similar to those returned by \code{\link{thief_vets}}}
 \item{ylim}{Limits for the y-axis. Default is \code{c(min(simulation, na.rm = T), max(simulation, na.rm = T))}}
 }
 \value{
-A base plot of the forecast mean (black line) and 95 percent prediction intervals (red dashed lines)
+A base plot of the forecast medeian (red dashed line) and credible intervals as a gradient polygon
 }
 \description{
-Plot simulation predictions from a reconciled VETS model
+Plot simulation predictions from a reconciled thief model
 }
 \details{
-The sum of the CRPS is calculated against the test observations in \code{y_test} and returned. Calculations
-use the \code{\link[scoringRules]{crps_sample}} function
+The forecast distribution is used to calculate highest posterior density credible estimates for the following
+intervals: \code{c(0.95, 0.9, 0.85, 0.8, 0.75, 0.7)}
 }

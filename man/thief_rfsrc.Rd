@@ -11,7 +11,7 @@ thief_rfsrc(
   frequency = 52,
   horizon = NULL,
   predict_quantiles = TRUE,
-  cores = 1
+  cores = parallel::detectCores() - 1
 )
 }
 \arguments{
@@ -28,8 +28,9 @@ between \code{-1} and \code{2} inclusive. If \code{y_series} contains zeros, \co
 
 \item{horizon}{\code{integer}. The horizon to forecast. Defaults to \code{frequency}}
 
-\item{predict_quantiles}{\code{logical}. If \code{TRUE}, \code{\link[randomForestSRC]{quantreg.rfsrc}} is used
-to train the multivariate random forest using quantile loss to predict uncertainty intervals}
+\item{predict_quantiles}{\code{logical}. If \code{TRUE}, a \code{\link[randomForestSRC]{quantreg.rfsrc}} is used
+to train a second multivariate random forest using quantile loss to predict uncertainty intervals. If \code{FALSE},
+the distribution of estimates from the \code{2000} original random forests is used to estimate uncertainties}
 
 \item{cores}{\code{integer}. The number of cores to use}
 }
@@ -57,7 +58,7 @@ distribution of \code{1000} sample paths for each series' forecast are returned
 library(mvforecast)
 data("ixodes_vets_dat")
 
-#Fit a a thief_rfsrc model
+#Fit a thief_rfsrc model
 mod1 <- thief_rfsrc(y = ixodes_vets_dat$y_train,
 frequency = 52, k = 1,
 cores = parallel::detectCores() - 1)
@@ -66,7 +67,7 @@ cores = parallel::detectCores() - 1)
 calc_crps(mod1, y_test = ixodes_vets_dat$y_test)
 
 Plot simulation results for one of the plots in the NEON dataset
-plot_vets_preds(simulation = mod1[[4]])
+plot_mv_preds(simulation = mod1[[4]])
 points(as.vector(ixodes_vets_dat$y_test[,4]))}
 
 }

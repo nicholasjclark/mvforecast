@@ -28,7 +28,8 @@ Imports: parallel,
     stats,
     purrr,
     scoringRules,
-    randomForestSRC
+    randomForestSRC,
+    ProbReco
 Remotes: tsmodels/tsmethods@16601e3bd21d7293490d820137324e4f16462dbf,
     tsmodels/tsaux@da46a751c619ba10184f0749ccd7d9fb9a7be31f,
     tsmodels/tsets@51a26d80fdfafc41d564d08a38fe4c9776ba333f,
