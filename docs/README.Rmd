@@ -53,13 +53,20 @@ mod3 <- suppressWarnings(thief_vets(y = ixodes_vets_dat$y_train,
                    cores = 6,
                    group = ixodes_vets_dat$groups,
                    save_plots = F))
+```
 
-site <- 3
-par(mfrow=c(3,1))
+```{r}
+site = 3
 plot_mv_preds(simulation = mod1[[site]], main = 'thief_rfsrc')
 points(as.vector(ixodes_vets_dat$y_test[,site]), col = 'black', pch = 16)
+```
+
+```{r}
 plot_mv_preds(simulation = mod2[[site]], main = 'thief_ensemble')
 points(as.vector(ixodes_vets_dat$y_test[,site]), col = 'black', pch = 16)
+```
+
+```{r}
 plot_mv_preds(simulation = mod3[[site]], main = 'thief_vets')
 points(as.vector(ixodes_vets_dat$y_test[,site]), col = 'black', pch = 16)
 ```

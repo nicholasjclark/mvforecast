@@ -47,9 +47,9 @@ test_mvforecast()
     #> 
     #> 
     #> Calculating CRPS against ixodes_vets_dat$ytest for both models (lower is better)
-    #>                     Min. X1st.Qu.    Median      Mean X3rd.Qu.     Max.
-    #> vets_crps       22.30106 80.79992 103.44327 128.51980 142.0079 276.6018
-    #> thief_vets_crps 17.58664 33.01005  38.96844  59.44784  53.7366 172.0430
+    #>                     Min. X1st.Qu.    Median     Mean X3rd.Qu.     Max.
+    #> vets_crps       22.30454 78.92754 104.64987 128.3975 141.7734 275.8718
+    #> thief_vets_crps 14.94983 28.27833  40.40699  59.1694  55.7548 171.8935
 
 We can explore how the different models produce forecast distributions by fitting each and plotting the resulting forecasts for a single plot
 
@@ -60,15 +60,7 @@ mod1 <- suppressWarnings(thief_rfsrc(y = ixodes_vets_dat$y_train,
 #> 
 #> Fitting a rfsrc model to series with frequency 52 
 #> 
-#> Fitting ensemble forecasts to series at frequency 26 
-#> 
-#> Fitting ensemble forecasts to series at frequency 13 
-#> 
-#> Fitting ensemble forecasts to series at frequency 4 
-#> 
-#> Fitting ensemble forecasts to series at frequency 2 
-#> 
-#> Fitting ensemble forecasts to series at frequency 1 
+#> Fitting ensemble forecasts to all remaining series using 5 cores
 #> 
 #> Reconciling original forecasts
 
@@ -100,31 +92,42 @@ mod3 <- suppressWarnings(thief_vets(y = ixodes_vets_dat$y_train,
 #> Fitting ensemble forecasts to all remaining series using 6 cores
 #> 
 #> Reconciling original forecasts
+```
 
-site <- 3
-par(mfrow=c(3,1))
+``` r
+site = 3
 plot_mv_preds(simulation = mod1[[site]], main = 'thief_rfsrc')
 points(as.vector(ixodes_vets_dat$y_test[,site]), col = 'black', pch = 16)
+```
+
+![](README-unnamed-chunk-4-1.png)
+
+``` r
 plot_mv_preds(simulation = mod2[[site]], main = 'thief_ensemble')
 points(as.vector(ixodes_vets_dat$y_test[,site]), col = 'black', pch = 16)
+```
+
+![](README-unnamed-chunk-5-1.png)
+
+``` r
 plot_mv_preds(simulation = mod3[[site]], main = 'thief_vets')
 points(as.vector(ixodes_vets_dat$y_test[,site]), col = 'black', pch = 16)
 ```
 
-![](README-unnamed-chunk-3-1.png)
+![](README-unnamed-chunk-6-1.png)
 
 Comparison of the CRPS is straightforward
 
 ``` r
 calc_crps(mod1, y_test = ixodes_vets_dat$y_test)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   14.12   30.18   35.35   47.28   53.55  144.79
+#>   9.769  31.450  34.437  46.238  51.283 144.940
 calc_crps(mod2, y_test = ixodes_vets_dat$y_test)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   14.27   30.37   34.21   49.51   46.51  169.60
+#>   17.12   29.50   33.79   49.79   47.25  169.56
 calc_crps(mod3, y_test = ixodes_vets_dat$y_test)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   11.90   29.42   39.62   58.35   51.98  170.52
+#>   11.24   29.93   42.04   58.50   52.12  169.86
 ```
 
 Reconciliation is clearly a powerful technique that can drastically improve forecasts for many types of time series. In the interest of transparency and robust software engineering, a `Docker` container has been built to ensure functions in this package can be used in future if dependencies make any drastic changes. You can install the container from `Dockerhub`. For example, using `singularity` this would read as:
