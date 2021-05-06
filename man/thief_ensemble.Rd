@@ -60,7 +60,7 @@ cores = parallel::detectCores() - 1)
 calc_crps(mod1, y_test = ixodes_vets_dat$y_test)
 
 Plot simulation results for one of the plots in the NEON dataset
-plot_mv_preds(simulation = mod1[[4]])
+plot_mvforecast(simulation = mod1[[4]])
 points(as.vector(ixodes_vets_dat$y_test[,4]))}
 
 }

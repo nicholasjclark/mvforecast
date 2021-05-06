@@ -4,15 +4,15 @@
 \alias{ensemble_base}
 \title{Fit a series of univariate models and return a weighted ensemble forecast}
 \usage{
-ensemble_base(y_series, y_freq, lambda = NULL, k, bottom_series = FALSE)
+ensemble_base(y, frequency, lambda = NULL, k, bottom_series = FALSE)
 }
 \arguments{
-\item{y_series}{A \code{ts} object containing the series to forecast}
+\item{y}{A \code{ts} object containing the series to forecast}
 
-\item{y_freq}{The frequency of \code{y_series}}
+\item{frequency}{The seasonal frequency of \code{y}}
 
 \item{lambda}{\code{numeric}. The Box Cox power transformation parameter for all series. Must be
-between \code{-1} and \code{2} inclusive. If \code{y_series} contains zeros, \code{lambda} will be set to
+between \code{-1} and \code{2} inclusive. If \code{y} contains zeros, \code{lambda} will be set to
 \code{max(c(0.7, lambda))} to ensure stability of forecasts}
 
 \item{k}{\code{integer} specifying the length of the forecast horizon in multiples of \code{frequency}}

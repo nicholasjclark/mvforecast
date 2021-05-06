@@ -14,7 +14,7 @@
 #'@return A base plot of the forecast medeian (red dashed line) and credible intervals as a gradient polygon
 #'
 #'@export
-plot_mv_preds = function(simulation, main = '', ylab = 'Y',
+plot_mvforecast = function(simulation, main = '', ylab = 'Y',
                          ylim = c(min(simulation, na.rm = T), max(simulation, na.rm = T))){
 
   # Calculate prediction intervals

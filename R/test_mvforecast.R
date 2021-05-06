@@ -42,7 +42,7 @@ test_mvforecast = function(plot = TRUE){
 
   if(plot){
     cat('\n\nPlotting thief simulation forecast (lines) and true values (ytest points) for NEON plot_ID 4\n\n')
-    plot_mv_preds(simulation = mod2[[4]])
+    plot_mvforecast(simulation = mod2[[4]])
     points(as.vector(ixodes_vets_dat$y_test[,4]), col = 'black', pch = 16)
   }
 

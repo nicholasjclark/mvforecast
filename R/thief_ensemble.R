@@ -46,7 +46,7 @@
 #'calc_crps(mod1, y_test = ixodes_vets_dat$y_test)
 #'
 #'Plot simulation results for one of the plots in the NEON dataset
-#'plot_mv_preds(simulation = mod1[[4]])
+#'plot_mvforecast(simulation = mod1[[4]])
 #'points(as.vector(ixodes_vets_dat$y_test[,4]))}
 #'
 #'@export
@@ -153,9 +153,9 @@ thief_ensemble = function(y,
       outcome_residuals <- list()
       for(j in seq_len(NCOL(y))){
 
-        ensemble <- try(suppressWarnings(ensemble_base(y_series = outcomes[[i]][,j],
+        ensemble <- try(suppressWarnings(ensemble_base(y = outcomes[[i]][,j],
                                                        lambda = lambda,
-                                                       y_freq = frequencies[i],
+                                                       frequency = frequencies[i],
                                                        k = k,
                                                        bottom_series = ifelse(i == 1, TRUE, FALSE))), silent = TRUE)
 
@@ -186,9 +186,9 @@ thief_ensemble = function(y,
       cat('\nFitting ensemble forecasts to series at frequency', frequencies[i], '\n')
       for(j in seq_len(NCOL(y))){
 
-          ensemble <- try(suppressWarnings(ensemble_base(y_series = outcomes[[i]][,j],
+          ensemble <- try(suppressWarnings(ensemble_base(y = outcomes[[i]][,j],
                                     lambda = lambda,
-                                    y_freq = frequencies[i],
+                                    frequency = frequencies[i],
                                     k = k,
                                     bottom_series = ifelse(i == 1, TRUE, FALSE))), silent = TRUE)
 

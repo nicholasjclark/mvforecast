@@ -79,7 +79,7 @@ groups = groups)
 calc_crps(mod1, y_test = ixodes_vets_dat$y_test)
 
 Plot simulation results for one of the plots in the NEON dataset
-plot_mv_preds(simulation = mod1[[4]])
+plot_mvforecast(simulation = mod1[[4]])
 points(as.vector(ixodes_vets_dat$y_test[,4]))}
 
 }
@@ -93,6 +93,6 @@ Panagiotelis, A., Athanasopoulos, G., Gamakumara, P., and Hyndman, R. (2021). Fo
 A geometric view with new insights on bias correction. International Journal of Forecasting, 37(1), 343-359.
 }
 \seealso{
-\code{\link{ensemble_base}}, \code{\link{thief_ensemble}}, \code{\link[hts]{gts}},
+\code{\link{thief_ensemble}}, \code{\link[hts]{gts}},
 \code{\link[thief]{reconcilethief}}, \code{\link[ProbReco]{scoreopt}}
 }

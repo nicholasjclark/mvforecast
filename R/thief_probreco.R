@@ -25,7 +25,7 @@
 #'@return A \code{list} containing the reconciled forecast distributions for each series in \code{y}. Each element in
 #'the \code{list} is a \code{horizon x 1000 matrix} of forecast predictions
 #'
-#'@seealso \code{\link{ensemble_base}}, \code{\link{thief_ensemble}}, \code{\link[hts]{gts}},
+#'@seealso \code{\link{thief_ensemble}}, \code{\link[hts]{gts}},
 #'\code{\link[thief]{reconcilethief}}, \code{\link[ProbReco]{scoreopt}}
 #'
 #'@details Series in \code{y} are aggregated at all possible levels up to annual using \code{\link[thief]{tsaggregates}}.
@@ -61,7 +61,7 @@
 #'calc_crps(mod1, y_test = ixodes_vets_dat$y_test)
 #'
 #'Plot simulation results for one of the plots in the NEON dataset
-#'plot_mv_preds(simulation = mod1[[4]])
+#'plot_mvforecast(simulation = mod1[[4]])
 #'points(as.vector(ixodes_vets_dat$y_test[,4]))}
 #'
 #'@export
