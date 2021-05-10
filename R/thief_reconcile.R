@@ -9,12 +9,17 @@
 #'@param original_forecast Either a \code{forecast} or \code{list} object, the latter of which must contain slots
 #'named \code{forecast} (containing the mean, upper interval and lower interval forecasts) and \code{residuals} (containing
 #'residuals for the fitted forecast model)
+#'@param forecast_residuals Optional \code{vector} of residuals from the forecast, if the forecast is a matrix representing the
+#'forecast distribution
 #'@param lambda \code{numeric}. The Box Cox power transformation parameter for all series. Must be
 #'between \code{-1} and \code{2} inclusive. If \code{y} contains zeros, \code{lambda} will be set to
 #'\code{max(c(0.7, lambda))} to ensure stability of forecasts
 #'@param frequency \code{integer}. The seasonal frequency in \code{y}
 #'@param return_aggregates \code{Logical}. If \code{TRUE}, the forecasts and residuals for the aggregate series will
 #'also be returned
+#'@param prior_aggregates Optional result of a previous call to \code{thief_reconcile} that contains the
+#'forecasts and residuals from the temporal aggregate forecasts for the same \code{y. If supplied,
+#'forecasts for the temporal aggregates will not be calculated again prior to reconciliation, saving on computation.
 #'
 #'@seealso \code{\link[thief]{reconcilethief}}
 #'
@@ -26,7 +31,7 @@
 #'this adjusted forecast is returned
 #'
 #'@references Athanasopoulos, G., Hyndman, R.,  Kourentzes, N.,  and Petropoulos, F. Forecasting with temporal hierarchies.
-#'(2017) European Journal of Operational Research 262(1) 60–74
+#'(2017) European Journal of Operational Research 262(1)
 #'@examples
 #'\donttest{
 #'library(mvforecast)
@@ -49,9 +54,11 @@
 #'@export
 #'
 thief_reconcile = function(y, original_forecast,
+                           forecast_residuals = NULL,
                            lambda = NULL,
                            frequency,
-                           return_aggregates = FALSE){
+                           return_aggregates = FALSE,
+                           prior_aggregates = NULL){
   if(missing(lambda)){
     lambda <- ifelse((length(which(y == 0)) / length(y)) > 0.1, 0.7, 1)
   }
@@ -62,14 +69,19 @@ thief_reconcile = function(y, original_forecast,
     if(lambda < -1 || lambda > 2) stop('lambda must be between -1 and 2 inclusive')
   }
 
-
   xts.to.ts <- function(x, freq = 52) {
     start_time <- floor((lubridate::yday(start(x)) / 365) * freq)
     ts(as.numeric(x),
        start = c(lubridate::year(start(x)),
                  start_time), freq = freq)
   }
-  series <- xts.to.ts(y, freq = frequency)
+
+  if(class(y) == 'ts'){
+    series <- y
+  } else {
+    series <- xts.to.ts(y, freq = frequency)
+  }
+
   series_agg <- thief::tsaggregates(series)
   names <- vector()
   for(j in seq_along(series_agg)){
@@ -81,26 +93,52 @@ thief_reconcile = function(y, original_forecast,
   base <- vector("list", length(series_agg))
   residuals <- vector("list", length(series_agg))
 
-  forecast_class <- class(original_forecast)
+  forecast_class <- class(original_forecast)[1]
   if(forecast_class == 'forecast'){
     base[[1]] <- original_forecast
+    if(!(length(original_forecast$mean) / frequency) %in% seq(1,100, by = 1)){
+      stop('Forecast horizon must be a multiple of frequency for temporal reconciliation')
+    }
+    k <- ceiling(length(original_forecast$mean) / frequency)
     residuals[[1]] <- original_forecast$model$residuals
-  } else {
+  } else if(forecast_class == 'list'){
     base[[1]] <- original_forecast$forecast
+    if(!(length(original_forecast$forecast$mean) / frequency) %in% seq(1,100, by = 1)){
+      stop('Forecast horizon must be a multiple of frequency for temporal reconciliation')
+    }
     residuals[[1]] <- original_forecast$residuals
+    k <- ceiling(length(original_forecast$forecast$mean) / frequency)
+  } else {
+    quick_fc <- forecast::forecast(y, h = length(apply(original_forecast, 1, mean)))
+    quick_fc$mean <- ts(apply(original_forecast, 1, mean), start = start(quick_fc$mean),
+                        frequency = frequency)
+    base[[1]] <- quick_fc
+    if(!(length(apply(original_forecast, 1, mean)) / frequency) %in% seq(1,100, by = 1)){
+      stop('Forecast horizon must be a multiple of frequency for temporal reconciliation')
+    }
+    residuals[[1]] <- forecast_residuals
+    k <- ceiling(length(apply(original_forecast, 1, mean)) / frequency)
   }
 
   frequencies <- as.numeric(unlist(lapply(series_agg, frequency), use.names = FALSE))
+
+  if(!is.null(prior_aggregates)){
+    for(i in seq(1, length(series_agg) - 1)){
+      base[[i+1]] <- prior_aggregates$aggregate_forecasts[[i+1]]
+      residuals[[i+1]] <- prior_aggregates$aggregate_residuals[[i+1]]
+    }
+
+  } else {
 
   # Create aggregate forecasts
   for(i in seq(1, length(series_agg) - 1)){
     cat('\nFitting ensemble forecasts to series at frequency', frequencies[i+1], '\n')
 
-    ensemble <- try(suppressWarnings(ensemble_base(y_series = series_agg[[i+1]],
+    ensemble <- try(suppressWarnings(ensemble_base(y = series_agg[[i+1]],
                                                    lambda = lambda,
-                                                   y_freq = frequencies[i+1],
+                                                   frequency = frequencies[i+1],
                                                    k = k,
-                                                   bottom_series = FALSE)), silent = TRUE)
+                                                   bottom_series = TRUE)), silent = TRUE)
 
     if(inherits(ensemble, 'try-error')){
       base[[i+1]] <- forecast::forecast(series_agg[[i+1]],
@@ -112,6 +150,7 @@ thief_reconcile = function(y, original_forecast,
       base[[i+1]] <- ensemble[[1]]
       residuals[[i+1]] <- ensemble[[2]]
     }
+  }
   }
 
   # Reconcile forecasts
@@ -164,11 +203,17 @@ thief_reconcile = function(y, original_forecast,
     reconciled_forecast$mean <- series_reconciled[[1]]$mean
     reconciled_forecast$upper <- series_reconciled[[1]]$upper
     reconciled_forecast$lower <- series_reconciled[[1]]$lower
-  } else {
+  } else if(forecast_class == 'list'){
     reconciled_forecast <- original_forecast
     reconciled_forecast$forecast$mean <- series_reconciled[[1]]$mean
     reconciled_forecast$forecast$upper <- series_reconciled[[1]]$upper
     reconciled_forecast$forecast$lower <- series_reconciled[[1]]$lower
+  } else {
+    adjustment <- as.vector(series_reconciled[[1]]$mean - base[[1]]$mean)
+    reconciled_forecast <- original_forecast + adjustment
+    if(!any(y < 0)){
+      reconciled_forecast[reconciled_forecast < 0] <- 0
+    }
   }
 
   if(return_aggregates){

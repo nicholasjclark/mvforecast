@@ -43,16 +43,9 @@ ensemble_base = function(y, frequency, lambda = NULL, k, bottom_series = FALSE){
    if(lambda < -1 || lambda > 2) stop('lambda must be between -1 and 2 inclusive')
  }
 
-  # If enough observations exist, split into training and testing data
-  if(length(y) >= (frequency * 4)){
-    cv <- TRUE
-    y_train <- subset(y, end = floor(length(y) * .7))
-    y_test <- subset(y, start = floor(length(y) * .7) + 1)
-  } else {
-    cv <- FALSE
-    y_train <- y
-    y_test <- rep(NA, c(length(y), frequency * k)[which.min(c(0, (frequency * k) - length(y)))])
-  }
+  cv <- FALSE
+  y_train <- y
+  y_test <- rep(NA, c(length(y), frequency * k)[which.min(c(0, (frequency * k) - length(y)))])
 
 # Try a thetaf model
 theta_base <- try(forecast::thetaf(y_train,
@@ -97,11 +90,11 @@ for(i in seq_along(windows)){
                           ratio = (2 / (windows[i] + 1)))
 }
 
-ewma_fc <- matrix(NA, nrow = length(y_test), ncol = ncol(ewma))
+ewma_fc <- matrix(NA, nrow = frequency * k, ncol = ncol(ewma))
 for(i in 1:ncol(ewma)){
   # Add Gaussian noise to forecasted moving averages for better generalizability
   ewma_fc[,i] <- jitter(forecast::forecast(ts(ewma[,i],
-                                              frequency = frequency), h = length(y_test))$mean, amount = 0.25)
+                                              frequency = frequency), h = frequency * k)$mean, amount = 0.25)
 }
 
 arima_base <- try(forecast::forecast(forecast::auto.arima(y_train,
@@ -119,18 +112,18 @@ if(inherits(arima_base, 'try-error')){
   if(cv){
     arima_mae <- abs(as.vector(arima_base$mean) - as.vector(y_test))
 
-    ewma <- matrix(NA, nrow = length(y), ncol = length(windows))
+    ewma <- matrix(NA, nrow = length(y_train), ncol = length(windows))
     for(i in seq_along(windows)){
-      ewma[,i] <- ewma_filter(as.vector(zoo::rollmean(y,
+      ewma[,i] <- ewma_filter(as.vector(zoo::rollmean(y_train,
                                                       k = ceiling(windows[i] ^ 0.8),
                                                       na.pad = TRUE,
                                                       fill = 0)),
                               ratio = (2 / (windows[i] + 1)))
     }
 
-    ewma_fc <- matrix(NA, nrow = length(frequency * k), ncol = ncol(ewma))
+    ewma_fc <- matrix(NA, nrow = frequency * k, ncol = ncol(ewma))
     for(i in 1:ncol(ewma)){
-      ewma_fc[,i] <- jitter(forecast::forecast(ewma[,i], h = length(y_test))$mean, amount = 0.1)
+      ewma_fc[,i] <- jitter(forecast::forecast(ewma[,i], h = frequency * k)$mean, amount = 0.1)
     }
 
     arima_base <- forecast::forecast(forecast::auto.arima(y_train,
@@ -246,11 +239,9 @@ if(ets_base == 'error'){
   if(cv){
     ets_mae <- abs(as.vector(ets_base$mean) - as.vector(y_test))
     if(frequency <= 24){
-      ets_base <- forecast::forecast(forecast::baggedETS(y,
-                                                         bootstrapped_series = forecast::bld.mbb.bootstrap(y, 20),
-                                                         lambda = lambda),
+      ets_base <- forecast::forecast(ets(y,
                                          h = frequency * k,
-                                     lambda = lambda)
+                                         lambda = lambda))
     } else {
       ets_base <- forecast::forecast(forecast::stlf(y,
                                                    lambda = lambda),

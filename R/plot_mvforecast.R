@@ -56,7 +56,7 @@ plot_mvforecast = function(simulation, main = '', ylab = 'Y',
        xaxt='n',yaxt='n', axes = FALSE)
   rect(par("usr")[1],par("usr")[3],par("usr")[2],par("usr")[4],col = rgb(0.98, 0.98, 0.98, 1),
        border = NA)
-  axis(side = 2, at = round(seq(0, max(simulation, na.rm = T), length.out = y_break_length), 1))
+  axis(side = 2, at = round(seq(0, max(forecast, na.rm = T), length.out = y_break_length), 1))
   axis(side = 1, at = seq(0, nrow(forecast) + x_break_length, by = x_break_length))
 
 
