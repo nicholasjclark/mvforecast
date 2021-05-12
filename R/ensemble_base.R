@@ -212,26 +212,18 @@ if(inherits(tbats_base, 'try-error')){
 
 # Try an ETS model
 if(frequency <= 24){
-  ets_base <- tryCatch({
-    forecast::forecast(forecast::ets(y_train, lambda = lambda),
+  ets_base <- try(forecast::forecast(forecast::ets(y_train, lambda = lambda),
                        h = length(y_test),
-                       lambda = lambda)
-  }, error = function(e) {
-    'error'
-  })
+                       lambda = lambda), silent = T)
 
 } else {
-  ets_base <- tryCatch({
-    forecast::forecast(forecast::stlf(y_train,
+  ets_base <- try(forecast::forecast(forecast::stlf(y_train,
                                       lambda = lambda),
                        h = length(y_test),
-                       lambda = lambda)
-  }, error = function(e) {
-    'error'
-  })
+                       lambda = lambda), silent = T)
 }
 
-if(ets_base == 'error'){
+if(inherits(ets_base, 'try-error')){
   use_ets <- FALSE
   ets_mae <- rep(NA, length(y_test))
 } else {
