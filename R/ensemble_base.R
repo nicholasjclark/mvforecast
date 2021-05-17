@@ -210,18 +210,12 @@ if(inherits(tbats_base, 'try-error')){
   }
 }
 
-# Try an ETS model
-if(frequency <= 24){
-  ets_base <- try(forecast::forecast(forecast::ets(y_train, lambda = lambda),
-                       h = length(y_test),
-                       lambda = lambda), silent = T)
-
-} else {
-  ets_base <- try(forecast::forecast(forecast::stlf(y_train,
+# Try an ETS model (using stlf; etsmodel has conflicting issues with Stan compilers and leads to crashes
+# on Linux clusters for some reason)
+ets_base <- try(forecast::forecast(forecast::stlf(y_train,
                                       lambda = lambda),
                        h = length(y_test),
                        lambda = lambda), silent = T)
-}
 
 if(inherits(ets_base, 'try-error')){
   use_ets <- FALSE
@@ -230,18 +224,12 @@ if(inherits(ets_base, 'try-error')){
   use_ets <- TRUE
   if(cv){
     ets_mae <- abs(as.vector(ets_base$mean) - as.vector(y_test))
-    if(frequency <= 24){
-      ets_base <- forecast::forecast(ets(y,
-                                         h = frequency * k,
-                                         lambda = lambda))
-    } else {
       ets_base <- forecast::forecast(forecast::stlf(y,
                                                    lambda = lambda),
                                      h = frequency * k,
                                      lambda = lambda)
       ets_base$upper <- cbind(ets_base$upper, ets_base$upper)
       ets_base$lower <- cbind(ets_base$lower, ets_base$lower)
-    }
   } else {
     ets_mae <- tail(as.vector(abs(residuals(ets_base))), length(y_test))
   }
