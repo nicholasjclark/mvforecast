@@ -93,7 +93,7 @@ for(i in seq_along(windows)){
 ewma_fc <- matrix(NA, nrow = frequency * k, ncol = ncol(ewma))
 for(i in 1:ncol(ewma)){
   # Add Gaussian noise to forecasted moving averages for better generalizability
-  ewma_fc[,i] <- jitter(forecast::forecast(ts(ewma[,i],
+  ewma_fc[,i] <- jitter(forecast::snaive(ts(ewma[,i],
                                               frequency = frequency), h = frequency * k)$mean, amount = 0.25)
 }
 
@@ -123,7 +123,7 @@ if(inherits(arima_base, 'try-error')){
 
     ewma_fc <- matrix(NA, nrow = frequency * k, ncol = ncol(ewma))
     for(i in 1:ncol(ewma)){
-      ewma_fc[,i] <- jitter(forecast::forecast(ewma[,i], h = frequency * k)$mean, amount = 0.1)
+      ewma_fc[,i] <- jitter(forecast::snaive(ewma[,i], h = frequency * k)$mean, amount = 0.1)
     }
 
     arima_base <- forecast::forecast(forecast::auto.arima(y_train,

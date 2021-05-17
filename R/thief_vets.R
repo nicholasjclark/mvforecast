@@ -494,9 +494,9 @@ thief_vets = function(y,
                                                        bottom_series = ifelse(i == 1, TRUE, FALSE))), silent = TRUE)
 
         if(inherits(ensemble, 'try-error')){
-          outcome_base[[j]] <- forecast::forecast(outcomes[[i]][,j],
+          outcome_base[[j]] <- forecast::snaive(outcomes[[i]][,j],
                                                   h = k * frequencies[i])
-          outcome_residuals[[j]] <- residuals(forecast::forecast(outcomes[[i]][,j],
+          outcome_residuals[[j]] <- residuals(forecast::snaive(outcomes[[i]][,j],
                                                                  h = k * frequencies[i]))
 
         } else {
@@ -536,9 +536,9 @@ thief_vets = function(y,
                                                        bottom_series = ifelse(i == 1, TRUE, FALSE))), silent = TRUE)
 
         if(inherits(ensemble, 'try-error')){
-          base[[i]][[j]] <- forecast::forecast(outcomes[[i]][,j],
+          base[[i]][[j]] <- forecast::snaive(outcomes[[i]][,j],
                                                h = k * frequencies[i])
-          residuals[[i]][[j]] <- residuals(forecast::forecast(outcomes[[i]][,j],
+          residuals[[i]][[j]] <- residuals(forecast::snaive(outcomes[[i]][,j],
                                                               h = k * frequencies[i]))
 
         } else {

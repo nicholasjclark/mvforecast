@@ -190,7 +190,7 @@ thief_rfsrc = function(y,
       ewma_fcs <- matrix(NA, nrow = frequency * k, ncol = ncol(ewmas))
       for(w in 1:ncol(ewmas)){
         # Add Gaussian noise to forecasted moving averages for better generalizability
-        ewma_fcs[,w] <- suppressWarnings(jitter(forecast::forecast(ts(ewmas[,w],
+        ewma_fcs[,w] <- suppressWarnings(jitter(forecast::snaive(ts(ewmas[,w],
                                                      frequency = frequency),
                                                   h = frequency * k)$mean, amount = 0.25))
       }
@@ -321,9 +321,9 @@ thief_rfsrc = function(y,
 
             if(inherits(ensemble, 'try-error')){
               rm(ensemble)
-              outcome_base[[j]] <- forecast::forecast(.subset2(outcomes, i)[,j],
+              outcome_base[[j]] <- forecast::snaive(.subset2(outcomes, i)[,j],
                                                       h = k * frequencies[i])
-              outcome_residuals[[j]] <- residuals(forecast::forecast(.subset2(outcomes, i)[,j],
+              outcome_residuals[[j]] <- residuals(forecast::snaive(.subset2(outcomes, i)[,j],
                                                                      h = k * frequencies[i]))
 
             } else {
@@ -367,9 +367,9 @@ thief_rfsrc = function(y,
            })
 
         if(ensemble == 'error'){
-          base[[i]][[j]] <- forecast::forecast(.subset2(outcomes, i)[,j],
+          base[[i]][[j]] <- forecast::snaive(.subset2(outcomes, i)[,j],
                                              h = k * frequencies[i])
-          residuals[[i]][[j]] <- residuals(forecast::forecast(.subset2(outcomes, i)[,j],
+          residuals[[i]][[j]] <- residuals(forecast::snaive(.subset2(outcomes, i)[,j],
                                                             h = k * frequencies[i]))
 
         } else {
