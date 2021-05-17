@@ -109,7 +109,7 @@ thief_reconcile = function(y, original_forecast,
     residuals[[1]] <- original_forecast$residuals
     k <- ceiling(length(original_forecast$forecast$mean) / frequency)
   } else {
-    quick_fc <- forecast::forecast(y, h = length(apply(original_forecast, 1, mean)))
+    quick_fc <- forecast::snaive(y, h = length(apply(original_forecast, 1, mean)))
     quick_fc$mean <- ts(apply(original_forecast, 1, mean), start = start(quick_fc$mean),
                         frequency = frequency)
     base[[1]] <- quick_fc
@@ -141,9 +141,9 @@ thief_reconcile = function(y, original_forecast,
                                                    bottom_series = TRUE)), silent = TRUE)
 
     if(inherits(ensemble, 'try-error')){
-      base[[i+1]] <- forecast::forecast(series_agg[[i+1]],
+      base[[i+1]] <- forecast::snaive(series_agg[[i+1]],
                                         h = k * frequencies[i+1])
-      residuals[[i+1]] <- residuals(forecast::forecast(series_agg[[i+1]],
+      residuals[[i+1]] <- residuals(forecast::snaive(series_agg[[i+1]],
                                                        h = k * frequencies[i+1]))
 
     } else {
