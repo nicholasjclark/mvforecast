@@ -166,7 +166,7 @@ thief_rfsrc = function(y,
                                                                  k = ceiling(windows[w] ^ 0.8),
                                                                  na.pad = TRUE,
                                                                  fill = 0)),
-                                         ratio = (2 / (windows[w] + 1))), amount = 0.25))
+                                         ratio = (2 / (windows[w] + 1))), amount = 0.5))
         }
         ewma
       }))
@@ -179,7 +179,7 @@ thief_rfsrc = function(y,
                                    data = rf_data,
                                    ntree = 2000,
                                    nsplit = NULL,
-                                   nodesize = 12)
+                                   nodesize = 10)
 
       # Store residuals
       for(j in 1:NCOL(y)){
@@ -190,9 +190,9 @@ thief_rfsrc = function(y,
       ewma_fcs <- matrix(NA, nrow = frequency * k, ncol = ncol(ewmas))
       for(w in 1:ncol(ewmas)){
         # Add Gaussian noise to forecasted moving averages for better generalizability
-        ewma_fcs[,w] <- suppressWarnings(jitter(forecast::snaive(ts(ewmas[,w],
-                                                     frequency = frequency),
-                                                  h = frequency * k)$mean, amount = 0.25))
+        ewma_fcs[,w] <- suppressWarnings(jitter(forecast::forecast(forecast::stlf(ts(ewmas[,w],
+                                                     frequency = frequency), forecastfunction = rwf, drift = T),
+                                                  h = frequency * k)$mean, amount = 0.5))
       }
       newdata <- data.frame(ewma_fcs)
       colnames(newdata) <- colnames(rf_data)[-c(1:NCOL(y))]
@@ -204,7 +204,8 @@ thief_rfsrc = function(y,
                                                   data = rf_data,
                                                   ntree = 2000,
                                                   nsplit = NULL,
-                                                  nodesize = 12)
+                                                  nodesize = 15,
+                                                  method = 'forest')
         preds_quantiles <- randomForestSRC::quantreg(object = rf_quantiles , newdata = newdata)
         preds_quantiles <- purrr::map(preds_quantiles$quantreg, 'quantiles')
         rm(rf_quantiles)
@@ -223,14 +224,14 @@ thief_rfsrc = function(y,
         if(predict_quantiles){
           series_quantiles <- preds_quantiles[[series]]
           forecast <- do.call(rbind, lapply(seq_len(frequency * k), function(x){
-            quantiles <- c(series_quantiles[x,3], series_quantiles[x,10],
+            quantiles <- c(series_quantiles[x,3], series_quantiles[x,20],
                            series_quantiles[x,50], series_quantiles[x,80],
-                           series_quantiles[x,95])
+                           series_quantiles[x,97])
           }))
 
           # Smooth the uncertainy intervals
           forecast <- do.call(cbind, lapply(seq_len(ncol(forecast)), function(x){
-            as.vector(stats::filter(forecast[,x], 0.05, 'recursive', forecast[1,x]))
+            as.vector(forecast::tsclean(zoo::rollmedian(forecast[,x], k = max(3, floor(horizon / 10)), fill = NA)))
           }))
 
           # Estimate the full distribution at each horizon

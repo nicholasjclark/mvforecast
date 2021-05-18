@@ -1,6 +1,6 @@
 #'Fit a series of univariate models and return a weighted ensemble forecast
 #'
-#'This function fits five simple univariate forecast models to the series and calculates weights
+#'This function fits six simple univariate forecast models to the series and calculates weights
 #'that minimise the mean absolute scaled error of a weighted ensemble forecast
 #'
 #'@param y A \code{ts} object containing the series to forecast
@@ -11,7 +11,8 @@
 #'@param k \code{integer} specifying the length of the forecast horizon in multiples of \code{frequency}
 #'@param bottom_series \code{logical}. If \code{TRUE}, the two \code{auto.arima} models will be ignored
 #'to ensure bottom level series forecasts are not overconfident
-#'@details A total of five simple univariate models are tested on the series. These include
+#'@details A total of six simple univariate models are tested on the series. These include
+#'\code{\link[forecast]{stlf}} with an AR model for the seasonally-adjusted series,
 #'\code{\link[forecast]{auto.arima}} with exponentially weighted moving average regressors,
 #'\code{\link[forecast]{auto.arima}} with fourier terms \code{K = 4} regressors,
 #'\code{\link[forecast]{rwf}} with drift,
@@ -43,6 +44,24 @@ ensemble_base = function(y, frequency, lambda = NULL, k, bottom_series = FALSE){
   y_train <- y
   y_test <- rep(NA, c(length(y), frequency * k)[which.min(c(0, (frequency * k) - length(y)))])
 
+  # Try a stlf model
+  stlf_base <- try(forecast::forecast(forecast::stlf(y_train, forecastfunction = ar),
+                                      h = length(y_test)),
+                   silent = TRUE)
+  if(inherits(stlf_base, 'try-error')){
+    use_stlf <- FALSE
+    stlf_mae <- rep(NA, length(y_test))
+  } else {
+    use_stlf <- TRUE
+    if(cv){
+      stlf_mae <- abs(as.vector(stlf_base$mean) - as.vector(y_test))
+      stlf_base <- forecast::forecast(forecast::stlf(y, forecastfunction = ar),
+                                      h = frequency * k)
+    } else {
+      stlf_mae <- tail(as.vector(abs(residuals(stlf_base))), length(y_test))
+    }
+  }
+
 if(!bottom_series){
 
 # Try an auto.arima model with exponentially weighted moving average regressors
@@ -73,7 +92,7 @@ ewma_fc <- matrix(NA, nrow = frequency * k, ncol = ncol(ewma))
 for(i in 1:ncol(ewma)){
   # Add Gaussian noise to forecasted moving averages for better generalizability
   ewma_fc[,i] <- jitter(forecast::snaive(ts(ewma[,i],
-                                              frequency = frequency), h = frequency * k)$mean, amount = 0.25)
+                                              frequency = frequency), h = frequency * k)$mean, amount = 0.5)
 }
 
 arima_base <- try(forecast::forecast(forecast::auto.arima(y_train,
@@ -102,7 +121,7 @@ if(inherits(arima_base, 'try-error')){
 
     ewma_fc <- matrix(NA, nrow = frequency * k, ncol = ncol(ewma))
     for(i in 1:ncol(ewma)){
-      ewma_fc[,i] <- jitter(forecast::snaive(ewma[,i], h = frequency * k)$mean, amount = 0.1)
+      ewma_fc[,i] <- jitter(forecast::snaive(ewma[,i], h = frequency * k)$mean, amount = 0.5)
     }
 
     arima_base <- forecast::forecast(forecast::auto.arima(y_train,
@@ -123,7 +142,7 @@ arimaf_base <- try(forecast::forecast(forecast::auto.arima(y_train,
 
                                      # Add Gaussian noise to forecasted terms for better generalizability
                                      xreg = jitter(forecast::fourier(y_train, K = 4, h = length(y_test)),
-                                                   amount = 0.1)),
+                                                   amount = 0.5)),
                   silent = TRUE)
 if(inherits(arimaf_base, 'try-error')){
   use_arimaf <- FALSE
@@ -137,7 +156,7 @@ if(inherits(arimaf_base, 'try-error')){
                                                            xreg = forecast::fourier(y, K = 4)),
                                       h = frequency * k,
                                       xreg = jitter(forecast::fourier(y, K = 4, h = frequency * k),
-                                                    amount = 0.1))
+                                                    amount = 0.5))
   } else {
     arimaf_mae <- tail(as.vector(abs(residuals(arimaf_base))), length(y_test))
   }
@@ -203,20 +222,20 @@ if(inherits(snaive_base, 'try-error')){
 
 # Bind MAE estimates together and remove any that are all NAs prior to optimisation
 if(!bottom_series){
-  maes <- cbind(
+  maes <- cbind(stlf_mae,
                 arima_mae,
                 arimaf_mae,
                 naive_mae,
                 rwf_mae,
                 snaive_mae)
-  colnames(maes) <- c('arima', 'arimaf',
+  colnames(maes) <- c('stlf','arima', 'arimaf',
                       'naive', 'rwf', 'snaive')
 } else {
-  maes <- cbind(
+  maes <- cbind(stlf_mae,
                 naive_mae,
                 rwf_mae,
                 snaive_mae)
-  colnames(maes) <- c('naive', 'rwf', 'snaive')
+  colnames(maes) <- c('stlf','naive', 'rwf', 'snaive')
 }
 
 
@@ -311,25 +330,26 @@ weight_fcs = function(fcs, ens_weights){
 
 # Gather the base forecasts and calculate the ensemble
 if(!bottom_series){
-  fcs <- list(
+  fcs <- list(stlf_base,
               arima_base,
               arimaf_base,
               naive_base,
               rwf_base,
               snaive_base)
-  names(fcs) <- c('arima', 'arimaf',
+  names(fcs) <- c('stlf','arima', 'arimaf',
                   'naive', 'rwf', 'snaive')
 } else {
-  fcs <- list(
+  fcs <- list(stlf_base,
               naive_base,
               rwf_base,
               snaive_base)
-  names(fcs) <- c('naive', 'rwf', 'snaive')
+  names(fcs) <- c('stlf','naive', 'rwf', 'snaive')
 }
 
 fcs <- fcs[names(fcs) %in% names(ens_weights)]
 ensemble <- weight_fcs(fcs = fcs, ens_weights = ens_weights)
 rm(fcs, ens_weights, maes,
+   stlf_base,
    naive_base,
    rwf_base,
    snaive_base)

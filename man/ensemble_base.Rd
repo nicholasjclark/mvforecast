@@ -24,11 +24,12 @@ to ensure bottom level series forecasts are not overconfident}
 A \code{list} object containing the ensemble forecast and the ensemble residuals
 }
 \description{
-This function fits five simple univariate forecast models to the series and calculates weights
+This function fits six simple univariate forecast models to the series and calculates weights
 that minimise the mean absolute scaled error of a weighted ensemble forecast
 }
 \details{
-A total of five simple univariate models are tested on the series. These include
+A total of six simple univariate models are tested on the series. These include
+\code{\link[forecast]{stlf}} with an AR model for the seasonally-adjusted series,
 \code{\link[forecast]{auto.arima}} with exponentially weighted moving average regressors,
 \code{\link[forecast]{auto.arima}} with fourier terms \code{K = 4} regressors,
 \code{\link[forecast]{rwf}} with drift,
