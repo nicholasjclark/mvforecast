@@ -1,6 +1,6 @@
 #'Fit a series of univariate models and return a weighted ensemble forecast
 #'
-#'This function fits eight simple univariate forecast models to the series and calculates weights
+#'This function fits five simple univariate forecast models to the series and calculates weights
 #'that minimise the mean absolute scaled error of a weighted ensemble forecast
 #'
 #'@param y A \code{ts} object containing the series to forecast
@@ -11,12 +11,9 @@
 #'@param k \code{integer} specifying the length of the forecast horizon in multiples of \code{frequency}
 #'@param bottom_series \code{logical}. If \code{TRUE}, the two \code{auto.arima} models will be ignored
 #'to ensure bottom level series forecasts are not overconfident
-#'@details A total of eight simple univariate models are tested on the series. These include
+#'@details A total of five simple univariate models are tested on the series. These include
 #'\code{\link[forecast]{auto.arima}} with exponentially weighted moving average regressors,
 #'\code{\link[forecast]{auto.arima}} with fourier terms \code{K = 4} regressors,
-#'\code{\link[forecast]{tbats}},
-#'\code{\link[forecast]{thetaf}},
-#'\code{\link[forecast]{stlm}} with ARIMA errors,
 #'\code{\link[forecast]{rwf}} with drift,
 #'\code{\link[forecast]{naive}} and
 #'\code{\link[forecast]{snaive}}.
@@ -45,23 +42,6 @@ ensemble_base = function(y, frequency, lambda = NULL, k, bottom_series = FALSE){
   cv <- FALSE
   y_train <- y
   y_test <- rep(NA, c(length(y), frequency * k)[which.min(c(0, (frequency * k) - length(y)))])
-
-# Try a thetaf model
-theta_base <- try(forecast::thetaf(y_train,
-                               h = length(y_test)),
-                  silent = TRUE)
-if(inherits(theta_base, 'try-error')){
-  use_theta <- FALSE
-  theta_mae <- rep(NA, length(y_test))
-} else {
-  use_theta <- TRUE
-  if(cv){
-    theta_mae <- abs(as.vector(theta_base$mean) - as.vector(y_test))
-    theta_base <- forecast::thetaf(y, h = frequency * k)
-  } else {
-    theta_mae <- tail(as.vector(abs(residuals(theta_base))), length(y_test))
-  }
-}
 
 if(!bottom_series){
 
@@ -164,50 +144,6 @@ if(inherits(arimaf_base, 'try-error')){
 }
 }
 
-# Try an STLM with arima on the seasonally adjusted series model
-stlmar_base <- try(forecast::forecast(forecast::stlm(y_train,
-                                                     method = 'arima',
-                                                     lambda = lambda,
-                                                     s.window = 'periodic'),
-                                     h = length(y_test)),
-                  silent = TRUE)
-if(inherits(stlmar_base, 'try-error')){
-  use_stlmar <- FALSE
-  stlmar_mae <- rep(NA, length(y_test))
-} else {
-  use_stlmar <- TRUE
-  if(cv){
-    stlmar_mae <- abs(as.vector(stlmar_base$mean) - as.vector(y_test))
-    stlmar_base <- forecast::forecast(forecast::stlm(y,
-                                                         method = 'arima',
-                                                     s.window = 'periodic'),
-                                          h = frequency * k)
-  } else {
-    stlmar_mae <- tail(as.vector(abs(residuals(stlmar_base))), length(y_test))
-  }
-}
-
-# Try a TBATS model
-tbats_base <- try(forecast::forecast(forecast::tbats(y_train,
-                                                 lambda = lambda),
-                                   h = length(y_test),
-                                   lambda = lambda),
-                silent = TRUE)
-if(inherits(tbats_base, 'try-error')){
-  use_tbats <- FALSE
-  tbats_mae <- rep(NA, length(y_test))
-} else {
-  use_tbats <- TRUE
-  if(cv){
-    tbats_mae <- abs(as.vector(tbats_base$mean) - as.vector(y_test))
-    tbats_base <- forecast::forecast(forecast::tbats(y,
-                                                         lambda = lambda),
-                                         h = frequency * k,
-                                     lambda = lambda)
-  } else {
-    tbats_mae <- tail(as.vector(abs(residuals(tbats_base))), length(y_test))
-  }
-}
 
 # Try a naive model
 naive_base <- try(forecast::naive(y_train,
@@ -267,25 +203,20 @@ if(inherits(snaive_base, 'try-error')){
 
 # Bind MAE estimates together and remove any that are all NAs prior to optimisation
 if(!bottom_series){
-  maes <- cbind(theta_mae,
+  maes <- cbind(
                 arima_mae,
                 arimaf_mae,
-                stlmar_mae,
-                tbats_mae,
                 naive_mae,
                 rwf_mae,
                 snaive_mae)
-  colnames(maes) <- c('theta', 'arima', 'arimaf', 'stlmar', 'tbats',
+  colnames(maes) <- c('arima', 'arimaf',
                       'naive', 'rwf', 'snaive')
 } else {
-  maes <- cbind(theta_mae,
-                stlmar_mae,
-                tbats_mae,
+  maes <- cbind(
                 naive_mae,
                 rwf_mae,
                 snaive_mae)
-  colnames(maes) <- c('theta', 'stlmar', 'tbats',
-                      'naive', 'rwf', 'snaive')
+  colnames(maes) <- c('naive', 'rwf', 'snaive')
 }
 
 
@@ -380,33 +311,25 @@ weight_fcs = function(fcs, ens_weights){
 
 # Gather the base forecasts and calculate the ensemble
 if(!bottom_series){
-  fcs <- list(theta_base,
+  fcs <- list(
               arima_base,
               arimaf_base,
-              stlmar_base,
-              tbats_base,
               naive_base,
               rwf_base,
               snaive_base)
-  names(fcs) <- c('theta', 'arima', 'arimaf','stlmar', 'tbats',
+  names(fcs) <- c('arima', 'arimaf',
                   'naive', 'rwf', 'snaive')
 } else {
-  fcs <- list(theta_base,
-              stlmar_base,
-              tbats_base,
+  fcs <- list(
               naive_base,
               rwf_base,
               snaive_base)
-  names(fcs) <- c('theta', 'stlmar', 'tbats',
-                  'naive', 'rwf', 'snaive')
+  names(fcs) <- c('naive', 'rwf', 'snaive')
 }
 
 fcs <- fcs[names(fcs) %in% names(ens_weights)]
 ensemble <- weight_fcs(fcs = fcs, ens_weights = ens_weights)
 rm(fcs, ens_weights, maes,
-   theta_base,
-   stlmar_base,
-   tbats_base,
    naive_base,
    rwf_base,
    snaive_base)
