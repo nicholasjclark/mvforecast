@@ -1,6 +1,6 @@
 #'Fit a series of univariate models and return a weighted ensemble forecast
 #'
-#'This function fits nine simple univariate forecast models to the series and calculates weights
+#'This function fits eight simple univariate forecast models to the series and calculates weights
 #'that minimise the mean absolute scaled error of a weighted ensemble forecast
 #'
 #'@param y A \code{ts} object containing the series to forecast
@@ -11,11 +11,10 @@
 #'@param k \code{integer} specifying the length of the forecast horizon in multiples of \code{frequency}
 #'@param bottom_series \code{logical}. If \code{TRUE}, the two \code{auto.arima} models will be ignored
 #'to ensure bottom level series forecasts are not overconfident
-#'@details A total of nine simple univariate models are tested on the series. These include
+#'@details A total of eight simple univariate models are tested on the series. These include
 #'\code{\link[forecast]{auto.arima}} with exponentially weighted moving average regressors,
 #'\code{\link[forecast]{auto.arima}} with fourier terms \code{K = 4} regressors,
 #'\code{\link[forecast]{tbats}},
-#'\code{\link[forecast]{ets}},
 #'\code{\link[forecast]{thetaf}},
 #'\code{\link[forecast]{stlm}} with ARIMA errors,
 #'\code{\link[forecast]{rwf}} with drift,
@@ -210,31 +209,6 @@ if(inherits(tbats_base, 'try-error')){
   }
 }
 
-# Try an ETS model (using stlf; etsmodel has conflicting issues with Stan compilers and leads to crashes
-# on Linux clusters for some reason)
-ets_base <- try(forecast::forecast(forecast::stlf(y_train,
-                                      lambda = lambda),
-                       h = length(y_test),
-                       lambda = lambda), silent = T)
-
-if(inherits(ets_base, 'try-error')){
-  use_ets <- FALSE
-  ets_mae <- rep(NA, length(y_test))
-} else {
-  use_ets <- TRUE
-  if(cv){
-    ets_mae <- abs(as.vector(ets_base$mean) - as.vector(y_test))
-      ets_base <- forecast::forecast(forecast::stlf(y,
-                                                   lambda = lambda),
-                                     h = frequency * k,
-                                     lambda = lambda)
-      ets_base$upper <- cbind(ets_base$upper, ets_base$upper)
-      ets_base$lower <- cbind(ets_base$lower, ets_base$lower)
-  } else {
-    ets_mae <- tail(as.vector(abs(residuals(ets_base))), length(y_test))
-  }
-}
-
 # Try a naive model
 naive_base <- try(forecast::naive(y_train,
                                    h = length(y_test)),
@@ -298,21 +272,19 @@ if(!bottom_series){
                 arimaf_mae,
                 stlmar_mae,
                 tbats_mae,
-                ets_mae,
                 naive_mae,
                 rwf_mae,
                 snaive_mae)
-  colnames(maes) <- c('theta', 'arima', 'arimaf', 'stlmar', 'tbats', 'ets',
+  colnames(maes) <- c('theta', 'arima', 'arimaf', 'stlmar', 'tbats',
                       'naive', 'rwf', 'snaive')
 } else {
   maes <- cbind(theta_mae,
                 stlmar_mae,
                 tbats_mae,
-                ets_mae,
                 naive_mae,
                 rwf_mae,
                 snaive_mae)
-  colnames(maes) <- c('theta', 'stlmar', 'tbats', 'ets',
+  colnames(maes) <- c('theta', 'stlmar', 'tbats',
                       'naive', 'rwf', 'snaive')
 }
 
@@ -413,21 +385,19 @@ if(!bottom_series){
               arimaf_base,
               stlmar_base,
               tbats_base,
-              ets_base,
               naive_base,
               rwf_base,
               snaive_base)
-  names(fcs) <- c('theta', 'arima', 'arimaf','stlmar', 'tbats', 'ets',
+  names(fcs) <- c('theta', 'arima', 'arimaf','stlmar', 'tbats',
                   'naive', 'rwf', 'snaive')
 } else {
   fcs <- list(theta_base,
               stlmar_base,
               tbats_base,
-              ets_base,
               naive_base,
               rwf_base,
               snaive_base)
-  names(fcs) <- c('theta', 'stlmar', 'tbats', 'ets',
+  names(fcs) <- c('theta', 'stlmar', 'tbats',
                   'naive', 'rwf', 'snaive')
 }
 
@@ -437,7 +407,6 @@ rm(fcs, ens_weights, maes,
    theta_base,
    stlmar_base,
    tbats_base,
-   ets_base,
    naive_base,
    rwf_base,
    snaive_base)

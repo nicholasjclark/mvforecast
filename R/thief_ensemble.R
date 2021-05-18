@@ -23,7 +23,7 @@
 #'\code{\link[thief]{reconcilethief}}
 #'
 #'@details Series in \code{y} are aggregated at all possible levels up to annual using \code{\link[thief]{tsaggregates}}.
-#'\code{\link{ensemble_base}} is used on all levels of aggregation to find a weighted ensemble of nine
+#'\code{\link{ensemble_base}} is used on all levels of aggregation to find a weighted ensemble of eight
 #'univariate forecast models that minimises mean absolute scaled error. Forecasts are then reconciled
 #'using \code{\link[thief]{reconcilethief}} and are optionally constrained using non-negative optimisation if there are no
 #'negative values in \code{y}. Adjustments to the original unaggregated forecast are incorporated and a distribution of \code{1000} sample

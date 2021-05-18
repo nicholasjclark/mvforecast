@@ -28,7 +28,7 @@
 #'\code{\link[randomForestSRC]{rfsrc}} is used on the unaggregated series, with regressors including exponentially
 #'weighted moving averages of each series as well as time features that can be extracted from the series. Run conditions are:
 #'\code{ntree = 2000, nsplit = NULL, nodesize = 12}.
-#'\code{\link{ensemble_base}} is used on all aggretated levels to find a weighted ensemble of nine
+#'\code{\link{ensemble_base}} is used on all aggretated levels to find a weighted ensemble of eight
 #'univariate forecast models that minimises mean absolute scaled error. Forecasts are then reconciled
 #'using \code{\link[thief]{reconcilethief}} and are optionally constrained using non-negative optimisation if there
 #'are no negative values in \code{y}. Adjustments to the original unaggregated forecast are incorporated and a

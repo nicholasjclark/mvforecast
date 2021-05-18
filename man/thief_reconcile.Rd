@@ -7,9 +7,11 @@
 thief_reconcile(
   y,
   original_forecast,
+  forecast_residuals = NULL,
   lambda = NULL,
   frequency,
-  return_aggregates = FALSE
+  return_aggregates = FALSE,
+  prior_aggregates = NULL
 )
 }
 \arguments{
@@ -18,6 +20,9 @@ thief_reconcile(
 \item{original_forecast}{Either a \code{forecast} or \code{list} object, the latter of which must contain slots
 named \code{forecast} (containing the mean, upper interval and lower interval forecasts) and \code{residuals} (containing
 residuals for the fitted forecast model)}
+
+\item{forecast_residuals}{Optional \code{vector} of residuals from the forecast, if the forecast is a matrix representing the
+forecast distribution}
 
 \item{lambda}{\code{numeric}. The Box Cox power transformation parameter for all series. Must be
 between \code{-1} and \code{2} inclusive. If \code{y} contains zeros, \code{lambda} will be set to
@@ -62,7 +67,7 @@ autoplot(reconciled)
 }
 \references{
 Athanasopoulos, G., Hyndman, R.,  Kourentzes, N.,  and Petropoulos, F. Forecasting with temporal hierarchies.
-(2017) European Journal of Operational Research 262(1) 60–74
+(2017) European Journal of Operational Research 262(1)
 }
 \seealso{
 \code{\link[thief]{reconcilethief}}
