@@ -105,6 +105,7 @@ if(model == 'thief_rfsrc'){
                                   frequency = frequency,
                                   k = ceiling(prob_train_horizon / frequency),
                                   horizon = prob_train_horizon,
+                                  cores = cores,
                                   ...)
 }
 
@@ -115,6 +116,7 @@ if(model == 'thief_vets'){
                                      k = ceiling(prob_train_horizon / frequency),
                                      frequency = frequency,
                                      horizon = prob_train_horizon,
+                                     cores = cores,
                                      group = groups, ...), silent = T)
 
   # Errors will occur if there aren't enough seasonal periods in the data for ETS
@@ -126,6 +128,7 @@ if(model == 'thief_vets'){
                                     frequency = frequency,
                                     k = ceiling(prob_train_horizon / frequency),
                                     horizon = prob_train_horizon,
+                                    cores = cores,
                                     ...)
   }
 }
@@ -135,6 +138,7 @@ if(model == 'thief_ensemble'){
   y_forecast_probs <- thief_ensemble(y = y,
                                      frequency = frequency,
                                      k = ceiling(prob_train_horizon / frequency),
+                                     cores = cores,
                                      horizon = prob_train_horizon)
 }
 
@@ -153,6 +157,7 @@ all_agg_series <- zoo::as.zoo(aggregated_series)
 all_agg_series <- xts::xts(all_agg_series, lubridate::date_decimal(zoo::index(all_agg_series)))
 group_reconciled <- thief_ensemble(y = all_agg_series,
                                    frequency = frequency,
+                                   cores = cores,
                                    k = ceiling(prob_train_horizon / frequency),
                                    horizon = prob_train_horizon)
 
@@ -218,6 +223,7 @@ if(model == 'thief_rfsrc'){
                                   frequency = frequency,
                                   k = ceiling(horizon / frequency),
                                   horizon = horizon,
+                                  cores = cores,
                                   ...)
 }
 
@@ -228,6 +234,7 @@ if(model == 'thief_vets'){
                                      k = ceiling(horizon / frequency),
                                      frequency = frequency,
                                      horizon = horizon,
+                                     cores = cores,
                                      group = groups, ...), silent = T)
 
   # Errors will occur if there aren't enough seasonal periods in the data for ETS
@@ -236,6 +243,7 @@ if(model == 'thief_vets'){
     cat('**thief_vets errored due to too few seasonal periods in training data.\nUsing thief_rfsrc instead**\n\n')
     model <- 'thief_rfsrc'
     y_forecast_probs <- thief_rfsrc(y = original_y,
+                                    cores = cores,
                                     frequency = frequency,
                                     k = ceiling(horizon / frequency),
                                     horizon = horizon, ...)
@@ -245,6 +253,7 @@ if(model == 'thief_vets'){
 if(model == 'thief_ensemble'){
   cat('Fitting thief_ensemble for the full base series\n\n')
   y_forecast_probs <- thief_ensemble(y = original_y,
+                                     cores = cores,
                                      frequency = frequency,
                                      k = ceiling(horizon / frequency),
                                      horizon = horizon)
@@ -266,7 +275,8 @@ all_agg_series <- xts::xts(all_agg_series, lubridate::date_decimal(zoo::index(al
 group_reconciled <- thief_ensemble(y = all_agg_series,
                                    frequency = frequency,
                                    k = ceiling(horizon / frequency),
-                                   horizon = horizon)
+                                   horizon = horizon,
+                                   cores = cores)
 
 # Extract future forecast distributions for all series
 new_prob_distributions <- lapply(seq_len(nrow(y_forecast_probs[[1]])), function(h){

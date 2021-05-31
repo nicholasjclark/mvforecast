@@ -52,11 +52,11 @@ plot_mvforecast = function(simulation, main = '', ylab = 'Y',
 
   plot(as.vector(simulation[,1]), xlab = 'Horizon', main = main,
        ylab = ylab,
-       ylim = c(min(simulation, na.rm = T), max(forecast, na.rm = T)), type = 'n',
+       ylim = ylim, type = 'n',
        xaxt='n',yaxt='n', axes = FALSE)
   rect(par("usr")[1],par("usr")[3],par("usr")[2],par("usr")[4],col = rgb(0.98, 0.98, 0.98, 1),
        border = NA)
-  axis(side = 2, at = round(seq(0, max(forecast, na.rm = T), length.out = y_break_length), 1))
+  axis(side = 2, at = round(seq(0, ylim[2], length.out = y_break_length), 1))
   axis(side = 1, at = seq(0, nrow(forecast) + x_break_length, by = x_break_length))
 
 
@@ -83,7 +83,7 @@ plot_mvforecast = function(simulation, main = '', ylab = 'Y',
   for(i in seq(0, nrow(forecast), by = x_break_length/2)){
     abline(v=i, col = rgb(0.98, 0.98, 0.98, 0.45), lwd = 0.05)
   }
-  for(i in seq(0, max(forecast, na.rm = T), length.out = y_break_length*2)){
+  for(i in seq(0, ylim[2], length.out = y_break_length*2)){
     abline(h=i, col = rgb(0.98, 0.98, 0.98, 0.45), lwd = 0.05)
   }
 
