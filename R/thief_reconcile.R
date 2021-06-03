@@ -5,7 +5,7 @@
 #'
 #'@importFrom stats ts end start frequency
 #'
-#'@param y \code{xts matrix}. The outcome series to be modelled. \code{NAs} are currently not supported
+#'@param y Either a \code{xts matrix} or \code{ts} object. The outcome series to be modelled. \code{NAs} are currently not supported
 #'@param original_forecast Either a \code{forecast} or \code{list} object, the latter of which must contain slots
 #'named \code{forecast} (containing the mean, upper interval and lower interval forecasts) and \code{residuals} (containing
 #'residuals for the fitted forecast model)
@@ -138,7 +138,7 @@ thief_reconcile = function(y, original_forecast,
                                                    lambda = lambda,
                                                    frequency = frequencies[i+1],
                                                    k = k,
-                                                   bottom_series = TRUE)), silent = TRUE)
+                                                   bottom_series = FALSE)), silent = TRUE)
 
     if(inherits(ensemble, 'try-error')){
       base[[i+1]] <- forecast::snaive(series_agg[[i+1]],
@@ -156,11 +156,11 @@ thief_reconcile = function(y, original_forecast,
   # Reconcile forecasts
   series_base <- lapply(seq_along(base), function(x){
     # In case any forecasts are constant, need to jitter so that covariances can be estimated
-    base[[x]]$mean <- jitter(base[[x]]$mean, amount = 0.001)
+    base[[x]]$mean <- jitter(forecast::tsclean(base[[x]]$mean), amount = 0.001)
     base[[x]]
   })
   series_resids <- lapply(seq_along(residuals), function(x){
-    orig_resids <- as.vector(residuals[[x]])
+    orig_resids <- as.vector(forecast::tsclean(residuals[[x]]))
     # Resids must be a multiple of frequency for MinT reconciliation
     jitter(tail(orig_resids, floor(length(orig_resids) / frequencies[x]) * frequencies[x]),
            amount = 0.001)

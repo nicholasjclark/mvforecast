@@ -179,7 +179,12 @@ thief_rfsrc = function(y,
                                    data = rf_data,
                                    ntree = 2000,
                                    nsplit = NULL,
-                                   nodesize = 10)
+                                   nodesize = tune.nodesize(as.formula(paste0('cbind(',
+                                                                              paste0(colnames(y), collapse = ','),
+                                                                              ')~.')),
+                                                            data = rf_data,
+                                                            ntree = 2000,
+                                                            nsplit = NULL)$nsize.opt)
 
       # Store residuals
       for(j in 1:NCOL(y)){
