@@ -11,8 +11,9 @@
 #'@param k \code{integer} specifying the length of the forecast horizon in multiples of \code{frequency}
 #'@param bottom_series \code{logical}. If \code{TRUE}, the two \code{auto.arima} models will be ignored
 #'to ensure bottom level series forecasts are not overconfident
-#'@details A total of six simple univariate models are tested on the series. These include
+#'@details A total of seven simple univariate models are tested on the series. These include
 #'\code{\link[forecast]{stlf}} with an AR model for the seasonally-adjusted series,
+#'\code{\link[forecast]{ets}},
 #'\code{\link[forecast]{auto.arima}} with exponentially weighted moving average regressors,
 #'\code{\link[forecast]{auto.arima}} with fourier terms \code{K = 4} regressors,
 #'\code{\link[forecast]{rwf}} with drift,
@@ -25,7 +26,7 @@
 #'@return A \code{list} object containing the ensemble forecast and the ensemble residuals
 #'
 #'@export
-ensemble_base = function(y, frequency, lambda = NULL, k, bottom_series = FALSE){
+ensemble_base = function(y, frequency, lambda = 0, k = 1, bottom_series = FALSE){
 
   # Automatically set lambda if missing. If many zeros are present, use 0.7, which seems to give
   # good stability and balances overconfidence of prediction intervals. Otherwise use 1, which does not
@@ -61,6 +62,24 @@ ensemble_base = function(y, frequency, lambda = NULL, k, bottom_series = FALSE){
       stlf_mae <- tail(as.vector(abs(residuals(stlf_base))), length(y_test))
     }
   }
+
+  # Try an ets model
+    ets_base <- try(forecast::forecast(forecast::ets(y_train),
+                                       h = length(y_test)),
+                    silent = TRUE)
+    if(inherits(ets_base, 'try-error')){
+      use_ets <- FALSE
+      ets_mae <- rep(NA, length(y_test))
+    } else {
+      use_ets <- TRUE
+      if(cv){
+        ets_mae <- abs(as.vector(ets_base$mean) - as.vector(y_test))
+        ets_base <- forecast::forecast(forecast::ets(y),
+                                       h = frequency * k)
+      } else {
+        ets_mae <- tail(as.vector(abs(residuals(ets_base))), length(y_test))
+      }
+    }
 
 if(!bottom_series){
 
@@ -223,19 +242,21 @@ if(inherits(snaive_base, 'try-error')){
 # Bind MAE estimates together and remove any that are all NAs prior to optimisation
 if(!bottom_series){
   maes <- cbind(stlf_mae,
+                ets_mae,
                 arima_mae,
                 arimaf_mae,
                 naive_mae,
                 rwf_mae,
                 snaive_mae)
-  colnames(maes) <- c('stlf','arima', 'arimaf',
+  colnames(maes) <- c('stlf', 'ets', 'arima', 'arimaf',
                       'naive', 'rwf', 'snaive')
 } else {
   maes <- cbind(stlf_mae,
+                ets_mae,
                 naive_mae,
                 rwf_mae,
                 snaive_mae)
-  colnames(maes) <- c('stlf','naive', 'rwf', 'snaive')
+  colnames(maes) <- c('stlf', 'ets', 'naive', 'rwf', 'snaive')
 }
 
 
@@ -331,24 +352,27 @@ weight_fcs = function(fcs, ens_weights){
 # Gather the base forecasts and calculate the ensemble
 if(!bottom_series){
   fcs <- list(stlf_base,
+              ets_base,
               arima_base,
               arimaf_base,
               naive_base,
               rwf_base,
               snaive_base)
-  names(fcs) <- c('stlf','arima', 'arimaf',
+  names(fcs) <- c('stlf', 'ets', 'arima', 'arimaf',
                   'naive', 'rwf', 'snaive')
 } else {
   fcs <- list(stlf_base,
+              ets_base,
               naive_base,
               rwf_base,
               snaive_base)
-  names(fcs) <- c('stlf','naive', 'rwf', 'snaive')
+  names(fcs) <- c('stlf', 'ets', 'naive', 'rwf', 'snaive')
 }
 
 fcs <- fcs[names(fcs) %in% names(ens_weights)]
 ensemble <- weight_fcs(fcs = fcs, ens_weights = ens_weights)
 rm(fcs, ens_weights, maes,
+   ets_base,
    stlf_base,
    naive_base,
    rwf_base,

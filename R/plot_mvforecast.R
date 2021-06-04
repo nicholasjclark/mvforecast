@@ -1,4 +1,4 @@
-#'Plot simulation predictions from a reconciled thief model
+#'Plot simulation predictions
 #'
 #'
 #'
