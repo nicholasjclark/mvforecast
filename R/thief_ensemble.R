@@ -157,12 +157,12 @@ thief_ensemble = function(y,
                                                        lambda = lambda,
                                                        frequency = frequencies[i],
                                                        k = k,
-                                                       bottom_series = ifelse(i == 1, TRUE, FALSE))), silent = TRUE)
+                                                       bottom_series = FALSE)), silent = TRUE)
 
         if(inherits(ensemble, 'try-error')){
-          outcome_base[[j]] <- forecast::snaive(outcomes[[i]][,j],
+          outcome_base[[j]] <- forecast::forecast(outcomes[[i]][,j],
                                                h = k * frequencies[i])
-          outcome_residuals[[j]] <- residuals(forecast::snaive(outcomes[[i]][,j],
+          outcome_residuals[[j]] <- residuals(forecast::forecast(outcomes[[i]][,j],
                                                               h = k * frequencies[i]))
 
         } else {
@@ -190,7 +190,7 @@ thief_ensemble = function(y,
                                     lambda = lambda,
                                     frequency = frequencies[i],
                                     k = k,
-                                    bottom_series = ifelse(i == 1, TRUE, FALSE))), silent = TRUE)
+                                    bottom_series = FALSE)), silent = TRUE)
 
           if(inherits(ensemble, 'try-error')){
             base[[i]][[j]] <- forecast::forecast(outcomes[[i]][,j],
@@ -270,7 +270,7 @@ thief_ensemble = function(y,
     }))
     adjustment <- as.numeric(reconciled[[series]]$mean - base[[1]][[series]]$mean)
 
-    new_distribution <- sweep(orig_distrubion, 1, adjustment, "+")
+    new_distribution <- sweep(orig_distribution, 1, adjustment, "+")
     #new_distribution <- orig_distribution + adjustment
     if(!any(y < 0)){
       new_distribution[new_distribution < 0] <- 0

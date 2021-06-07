@@ -152,9 +152,9 @@ thief_rfsrc = function(y,
       }
 
       if(frequency >= 12){
-        windows <- unique(ceiling(seq(3, frequency / 2, length.out = 4)))
+        windows <- unique(ceiling(seq(3, frequency / 2, length.out = 3)))
       } else if (frequency >= 6) {
-        windows <- unique(ceiling(seq(1, frequency / 2, length.out = 3)))
+        windows <- unique(ceiling(seq(1, frequency / 2, length.out = 2)))
       } else {
         windows <- unique(seq(1, frequency, length.out = 2))
       }
@@ -177,13 +177,13 @@ thief_rfsrc = function(y,
                                     paste0(colnames(y), collapse = ','),
                                     ')~.')),
                                    data = rf_data,
-                                   ntree = 2000,
+                                   ntree = 1000,
                                    nsplit = NULL,
-                                   nodesize = tune.nodesize(as.formula(paste0('cbind(',
+                                   nodesize = randomForestSRC::tune.nodesize(as.formula(paste0('cbind(',
                                                                               paste0(colnames(y), collapse = ','),
                                                                               ')~.')),
                                                             data = rf_data,
-                                                            ntree = 2000,
+                                                            ntree = 1000,
                                                             nsplit = NULL)$nsize.opt)
 
       # Store residuals
@@ -207,10 +207,11 @@ thief_rfsrc = function(y,
                                                                     paste0(colnames(y), collapse = ','),
                                                                     ')~.')),
                                                   data = rf_data,
-                                                  ntree = 2000,
+                                                  ntree = 1000,
                                                   nsplit = NULL,
-                                                  nodesize = 15,
-                                                  method = 'forest')
+                                                  nodesize = rf$nodesize,
+                                                  method = 'forest',
+                                                  maxn = 5000)
         preds_quantiles <- randomForestSRC::quantreg(object = rf_quantiles , newdata = newdata)
         preds_quantiles <- purrr::map(preds_quantiles$quantreg, 'quantiles')
         rm(rf_quantiles)
@@ -229,9 +230,9 @@ thief_rfsrc = function(y,
         if(predict_quantiles){
           series_quantiles <- preds_quantiles[[series]]
           forecast <- do.call(rbind, lapply(seq_len(frequency * k), function(x){
-            quantiles <- c(series_quantiles[x,3], series_quantiles[x,20],
+            quantiles <- c(series_quantiles[x,2], series_quantiles[x,20],
                            series_quantiles[x,50], series_quantiles[x,80],
-                           series_quantiles[x,97])
+                           series_quantiles[x,98])
           }))
 
           # Smooth the uncertainy intervals
@@ -240,9 +241,16 @@ thief_rfsrc = function(y,
           }))
 
           # Estimate the full distribution at each horizon
+          get_sd = function(median, percentile, value){
+            abs(value - median) / abs(qnorm(percentile))
+          }
+
           prediction <- do.call(rbind, lapply(seq_len(nrow(forecast)), function(x){
-            fit <- density(series_quantiles[x,])
-            rnorm(1000, sample(series_quantiles[x,], size = 1000, replace = TRUE), fit$bw)
+            dist_sd <- max(unlist(lapply(seq(1:99), function(y){
+              ifelse(y!=50, get_sd(series_quantiles[x, 50], y / 100, series_quantiles[x,y]), NA)
+            })), na.rm = T)
+            # fit <- density(series_quantiles[x,], weights = weights / (sum(weights)))
+            rnorm(1000, series_quantiles[x,50], dist_sd)
           }))
 
           } else {
@@ -327,9 +335,9 @@ thief_rfsrc = function(y,
 
             if(inherits(ensemble, 'try-error')){
               rm(ensemble)
-              outcome_base[[j]] <- forecast::snaive(.subset2(outcomes, i)[,j],
+              outcome_base[[j]] <- forecast::forecast(.subset2(outcomes, i)[,j],
                                                       h = k * frequencies[i])
-              outcome_residuals[[j]] <- residuals(forecast::snaive(.subset2(outcomes, i)[,j],
+              outcome_residuals[[j]] <- residuals(forecast::forecast(.subset2(outcomes, i)[,j],
                                                                      h = k * frequencies[i]))
 
             } else {
@@ -444,7 +452,7 @@ thief_rfsrc = function(y,
   adjusted_distributions <- lapply(seq_len(ncol(y)), function(series){
     adjustment <- as.numeric(reconciled[[series]] - ts(base[[1]][[series]]$mean, frequency = frequency))
 
-    new_distribution <- sweep(orig_distrubions[[series]], 1, adjustment, "+")
+    new_distribution <- sweep(orig_distributions[[series]], 1, adjustment, "+")
     #new_distribution <- orig_distributions[[series]] + adjustment
     if(!any(y < 0)){
       new_distribution[new_distribution < 0] <- 0
