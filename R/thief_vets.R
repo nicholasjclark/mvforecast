@@ -472,6 +472,7 @@ thief_vets = function(y,
     cl <- makePSOCKcluster(cores)
     setDefaultCluster(cl)
     clusterExport(NULL, c('nonvets_frequencies',
+                          'frequencies',
                           'outcomes',
                           'lambda',
                           'k',
@@ -536,9 +537,9 @@ thief_vets = function(y,
                                                        bottom_series = ifelse(i == 1, TRUE, FALSE))), silent = TRUE)
 
         if(inherits(ensemble, 'try-error')){
-          base[[i]][[j]] <- forecast::snaive(outcomes[[i]][,j],
+          base[[i]][[j]] <- forecast::forecast(outcomes[[i]][,j],
                                                h = k * frequencies[i])
-          residuals[[i]][[j]] <- residuals(forecast::snaive(outcomes[[i]][,j],
+          residuals[[i]][[j]] <- residuals(forecast::forecast(outcomes[[i]][,j],
                                                               h = k * frequencies[i]))
 
         } else {
@@ -607,7 +608,8 @@ thief_vets = function(y,
   adjusted_distributions <- lapply(seq_len(ncol(y)), function(series){
     adjustment <- as.numeric(reconciled[[series]] - base[[1]][[series]]$mean)
 
-    new_distribution <- orig_distrubions[[series]] + adjustment
+    new_distribution <- sweep(orig_distrubions[[series]], 1, adjustment, "+")
+    #new_distribution <- orig_distrubions[[series]] + adjustment
     if(!any(y < 0)){
       new_distribution[new_distribution < 0] <- 0
     }

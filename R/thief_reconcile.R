@@ -210,7 +210,8 @@ thief_reconcile = function(y, original_forecast,
     reconciled_forecast$forecast$lower <- series_reconciled[[1]]$lower
   } else {
     adjustment <- as.vector(series_reconciled[[1]]$mean - base[[1]]$mean)
-    reconciled_forecast <- original_forecast + adjustment
+    reconciled_forecast <- sweep(original_forecast, 1, adjustment, "+")
+    #reconciled_forecast <- original_forecast + adjustment
     if(!any(y < 0)){
       reconciled_forecast[reconciled_forecast < 0] <- 0
     }

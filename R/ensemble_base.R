@@ -14,7 +14,7 @@
 #'@details A total of seven simple univariate models are tested on the series. These include
 #'\code{\link[forecast]{stlf}} with an AR model for the seasonally-adjusted series,
 #'\code{\link[forecast]{ets}},
-#'\code{\link[forecast]{auto.arima}} with exponentially weighted moving average regressors,
+#'\code{\link[forecast]{auto.arima}},
 #'\code{\link[forecast]{auto.arima}} with fourier terms \code{K = 4} regressors,
 #'\code{\link[forecast]{rwf}} with drift,
 #'\code{\link[forecast]{naive}} and
@@ -82,43 +82,10 @@ ensemble_base = function(y, frequency, lambda = 0, k = 1, bottom_series = FALSE)
     }
 
 if(!bottom_series){
-
-# Try an auto.arima model with exponentially weighted moving average regressors
-if(frequency >= 12){
-  windows <- unique(ceiling(seq(3, frequency / 2, length.out = 4)))
-} else if (frequency >= 6) {
-  windows <- unique(ceiling(seq(1, frequency / 2, length.out = 3)))
-} else {
-  windows <- unique(seq(1, frequency, length.out = 2))
-}
-
-ewma_filter <- function (x, ratio) {
-  c(stats::filter(x * ratio, 1 - ratio, "recursive", init = x[1]))
-}
-
-ewma <- matrix(NA, nrow = length(y_train), ncol = length(windows))
-for(i in seq_along(windows)){
-  y_unique <- ts(y_train, start = 1, frequency = frequency)
-
-  ewma[,i] <- ewma_filter(as.vector(zoo::rollmean(y_unique,
-                                                  k = ceiling(windows[i] ^ 0.8),
-                                                  na.pad = TRUE,
-                                                  fill = 0)),
-                          ratio = (2 / (windows[i] + 1)))
-}
-
-ewma_fc <- matrix(NA, nrow = frequency * k, ncol = ncol(ewma))
-for(i in 1:ncol(ewma)){
-  # Add Gaussian noise to forecasted moving averages for better generalizability
-  ewma_fc[,i] <- jitter(forecast::snaive(ts(ewma[,i],
-                                              frequency = frequency), h = frequency * k)$mean, amount = 0.5)
-}
-
+# Try an auto.arima model
 arima_base <- try(forecast::forecast(forecast::auto.arima(y_train,
-                                                          lambda = lambda,
-                                                          xreg = ewma),
-                                     h = length(y_test),
-                                     xreg = ewma_fc),
+                                                          lambda = lambda),
+                                     h = length(y_test)),
                                      silent = TRUE)
 
 if(inherits(arima_base, 'try-error')){
@@ -129,25 +96,9 @@ if(inherits(arima_base, 'try-error')){
   if(cv){
     arima_mae <- abs(as.vector(arima_base$mean) - as.vector(y_test))
 
-    ewma <- matrix(NA, nrow = length(y_train), ncol = length(windows))
-    for(i in seq_along(windows)){
-      ewma[,i] <- ewma_filter(as.vector(zoo::rollmean(y_train,
-                                                      k = ceiling(windows[i] ^ 0.8),
-                                                      na.pad = TRUE,
-                                                      fill = 0)),
-                              ratio = (2 / (windows[i] + 1)))
-    }
-
-    ewma_fc <- matrix(NA, nrow = frequency * k, ncol = ncol(ewma))
-    for(i in 1:ncol(ewma)){
-      ewma_fc[,i] <- jitter(forecast::snaive(ewma[,i], h = frequency * k)$mean, amount = 0.5)
-    }
-
     arima_base <- forecast::forecast(forecast::auto.arima(y_train,
-                                                          lambda = lambda,
-                                                          xreg = ewma),
-                                     h = frequency * k,
-                                     xreg = ewma_fc)
+                                                          lambda = lambda),
+                                     h = frequency * k)
   } else {
     arima_mae <- tail(as.vector(abs(residuals(arima_base))), length(y_test))
   }
@@ -161,7 +112,7 @@ arimaf_base <- try(forecast::forecast(forecast::auto.arima(y_train,
 
                                      # Add Gaussian noise to forecasted terms for better generalizability
                                      xreg = jitter(forecast::fourier(y_train, K = 4, h = length(y_test)),
-                                                   amount = 0.5)),
+                                                   amount = 0.1)),
                   silent = TRUE)
 if(inherits(arimaf_base, 'try-error')){
   use_arimaf <- FALSE
@@ -175,7 +126,7 @@ if(inherits(arimaf_base, 'try-error')){
                                                            xreg = forecast::fourier(y, K = 4)),
                                       h = frequency * k,
                                       xreg = jitter(forecast::fourier(y, K = 4, h = frequency * k),
-                                                    amount = 0.5))
+                                                    amount = 0.1))
   } else {
     arimaf_mae <- tail(as.vector(abs(residuals(arimaf_base))), length(y_test))
   }

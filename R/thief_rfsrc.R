@@ -373,9 +373,9 @@ thief_rfsrc = function(y,
            })
 
         if(ensemble == 'error'){
-          base[[i]][[j]] <- forecast::snaive(.subset2(outcomes, i)[,j],
+          base[[i]][[j]] <- forecast::forecast(.subset2(outcomes, i)[,j],
                                              h = k * frequencies[i])
-          residuals[[i]][[j]] <- residuals(forecast::snaive(.subset2(outcomes, i)[,j],
+          residuals[[i]][[j]] <- residuals(forecast::forecast(.subset2(outcomes, i)[,j],
                                                             h = k * frequencies[i]))
 
         } else {
@@ -444,7 +444,8 @@ thief_rfsrc = function(y,
   adjusted_distributions <- lapply(seq_len(ncol(y)), function(series){
     adjustment <- as.numeric(reconciled[[series]] - ts(base[[1]][[series]]$mean, frequency = frequency))
 
-    new_distribution <- orig_distributions[[series]] + adjustment
+    new_distribution <- sweep(orig_distrubions[[series]], 1, adjustment, "+")
+    #new_distribution <- orig_distributions[[series]] + adjustment
     if(!any(y < 0)){
       new_distribution[new_distribution < 0] <- 0
     }
