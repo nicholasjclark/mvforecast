@@ -15,6 +15,9 @@
 #'@param frequency \code{integer}. The seasonal frequency in \code{y}
 #'@param horizon \code{integer}. The horizon to forecast. Defaults to \code{frequency}
 #'@param cores \code{integer}. The number of cores to use
+#'@param tune_nodesize \code{logical}. If \code{TRUE}, \code{\link[randomForestSRC]{tune.nodesize}} is used to try and find
+#'the optimal nodesize tuning parameter for the multivariate random forest. This can be slow, so the default is \code{FALSE}
+#'and a nodesize of \code{10} is used
 #'@param predict_quantiles \code{logical}. If \code{TRUE}, a \code{\link[randomForestSRC]{quantreg.rfsrc}} is used
 #'to train a second multivariate random forest using quantile loss to predict uncertainty intervals. If \code{FALSE},
 #'the distribution of estimates from the \code{2000} original random forests is used to estimate uncertainties
@@ -62,6 +65,7 @@ thief_rfsrc = function(y,
                        frequency = 52,
                        horizon = NULL,
                        predict_quantiles = TRUE,
+                       tune_nodesize = FALSE,
                        cores = parallel::detectCores() - 1){
 
   # Check variables
@@ -173,18 +177,33 @@ thief_rfsrc = function(y,
       rf_data <- cbind(rf_data, ewmas)
 
       # Train the model
-      rf <- randomForestSRC::rfsrc(as.formula(paste0('cbind(',
-                                    paste0(colnames(y), collapse = ','),
-                                    ')~.')),
-                                   data = rf_data,
-                                   ntree = 1000,
-                                   nsplit = NULL,
-                                   nodesize = randomForestSRC::tune.nodesize(as.formula(paste0('cbind(',
-                                                                              paste0(colnames(y), collapse = ','),
-                                                                              ')~.')),
-                                                            data = rf_data,
-                                                            ntree = 1000,
-                                                            nsplit = NULL)$nsize.opt)
+      if(tune_nodesize){
+        rf <- randomForestSRC::rfsrc(as.formula(paste0('cbind(',
+                                                       paste0(colnames(y), collapse = ','),
+                                                       ')~.')),
+                                     data = rf_data,
+                                     ntree = 1000,
+                                     nsplit = NULL,
+                                     nodesize = randomForestSRC::tune.nodesize(as.formula(paste0('cbind(',
+                                                                                                 paste0(colnames(y), collapse = ','),
+                                                                                                 ')~.')),
+                                                                               data = rf_data,
+                                                                               ntree = 1000,
+                                                                               nodesizeTry = c(1:9, seq(10, 100, by = 5)),
+                                                                               nsplit = NULL)$nsize.opt)
+        opt_nodesize <- rf$nodesize
+
+      } else {
+        rf <- randomForestSRC::rfsrc(as.formula(paste0('cbind(',
+                                                       paste0(colnames(y), collapse = ','),
+                                                       ')~.')),
+                                     data = rf_data,
+                                     ntree = 1000,
+                                     nsplit = NULL,
+                                     nodesize = 10)
+        opt_nodesize <- 10
+      }
+
 
       # Store residuals
       for(j in 1:NCOL(y)){
@@ -209,7 +228,7 @@ thief_rfsrc = function(y,
                                                   data = rf_data,
                                                   ntree = 1000,
                                                   nsplit = NULL,
-                                                  nodesize = rf$nodesize,
+                                                  nodesize = opt_nodesize,
                                                   method = 'forest')
         preds_quantiles <- randomForestSRC::quantreg(object = rf_quantiles , newdata = newdata)
         preds_quantiles <- purrr::map(preds_quantiles$quantreg, 'quantiles')
