@@ -15,7 +15,7 @@ thief_reconcile(
 )
 }
 \arguments{
-\item{y}{\code{xts matrix}. The outcome series to be modelled. \code{NAs} are currently not supported}
+\item{y}{Either a \code{xts matrix} or \code{ts} object. The outcome series to be modelled. \code{NAs} are currently not supported}
 
 \item{original_forecast}{Either a \code{forecast} or \code{list} object, the latter of which must contain slots
 named \code{forecast} (containing the mean, upper interval and lower interval forecasts) and \code{residuals} (containing

@@ -11,6 +11,7 @@ thief_rfsrc(
   frequency = 52,
   horizon = NULL,
   predict_quantiles = TRUE,
+  tune_nodesize = FALSE,
   cores = parallel::detectCores() - 1
 )
 }
@@ -31,6 +32,10 @@ between \code{-1} and \code{2} inclusive. If \code{y_series} contains zeros, \co
 \item{predict_quantiles}{\code{logical}. If \code{TRUE}, a \code{\link[randomForestSRC]{quantreg.rfsrc}} is used
 to train a second multivariate random forest using quantile loss to predict uncertainty intervals. If \code{FALSE},
 the distribution of estimates from the \code{2000} original random forests is used to estimate uncertainties}
+
+\item{tune_nodesize}{\code{logical}. If \code{TRUE}, \code{\link[randomForestSRC]{tune.nodesize}} is used to try and find
+the optimal nodesize tuning parameter for the multivariate random forest. This can be slow, so the default is \code{FALSE}
+and a nodesize of \code{10} is used}
 
 \item{cores}{\code{integer}. The number of cores to use}
 }

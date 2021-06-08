@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_mvforecast.R
 \name{plot_mvforecast}
 \alias{plot_mvforecast}
-\title{Plot simulation predictions from a reconciled thief model}
+\title{Plot simulation predictions}
 \usage{
 plot_mvforecast(
   simulation,
@@ -25,7 +25,7 @@ similar to those returned by \code{\link{thief_vets}}}
 A base plot of the forecast medeian (red dashed line) and credible intervals as a gradient polygon
 }
 \description{
-Plot simulation predictions from a reconciled thief model
+Plot simulation predictions
 }
 \details{
 The forecast distribution is used to calculate highest posterior density credible estimates for the following

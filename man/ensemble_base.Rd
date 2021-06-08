@@ -4,7 +4,7 @@
 \alias{ensemble_base}
 \title{Fit a series of univariate models and return a weighted ensemble forecast}
 \usage{
-ensemble_base(y, frequency, lambda = NULL, k, bottom_series = FALSE)
+ensemble_base(y, frequency, lambda = 0, k = 1, bottom_series = FALSE)
 }
 \arguments{
 \item{y}{A \code{ts} object containing the series to forecast}
@@ -28,9 +28,10 @@ This function fits six simple univariate forecast models to the series and calcu
 that minimise the mean absolute scaled error of a weighted ensemble forecast
 }
 \details{
-A total of six simple univariate models are tested on the series. These include
+A total of seven simple univariate models are tested on the series. These include
 \code{\link[forecast]{stlf}} with an AR model for the seasonally-adjusted series,
-\code{\link[forecast]{auto.arima}} with exponentially weighted moving average regressors,
+\code{\link[forecast]{ets}},
+\code{\link[forecast]{auto.arima}},
 \code{\link[forecast]{auto.arima}} with fourier terms \code{K = 4} regressors,
 \code{\link[forecast]{rwf}} with drift,
 \code{\link[forecast]{naive}} and
