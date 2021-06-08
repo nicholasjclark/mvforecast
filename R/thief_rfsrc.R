@@ -210,8 +210,7 @@ thief_rfsrc = function(y,
                                                   ntree = 1000,
                                                   nsplit = NULL,
                                                   nodesize = rf$nodesize,
-                                                  method = 'forest',
-                                                  maxn = 5000)
+                                                  method = 'forest')
         preds_quantiles <- randomForestSRC::quantreg(object = rf_quantiles , newdata = newdata)
         preds_quantiles <- purrr::map(preds_quantiles$quantreg, 'quantiles')
         rm(rf_quantiles)
@@ -240,7 +239,8 @@ thief_rfsrc = function(y,
             as.vector(forecast::tsclean(zoo::rollmedian(forecast[,x], k = max(3, floor(horizon / 10)), fill = NA)))
           }))
 
-          # Estimate the full distribution at each horizon
+          # Estimate the distribution at each horizon by assuming it is gaussian and erring on the side
+          # of caution to reduce over-confidence
           get_sd = function(median, percentile, value){
             abs(value - median) / abs(qnorm(percentile))
           }
