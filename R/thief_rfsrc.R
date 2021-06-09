@@ -170,7 +170,7 @@ thief_rfsrc = function(y,
                                                                  k = ceiling(windows[w] ^ 0.8),
                                                                  na.pad = TRUE,
                                                                  fill = 0)),
-                                         ratio = (2 / (windows[w] + 1))), amount = 0.5))
+                                         ratio = (2 / (windows[w] + 1))), amount = 0.25))
         }
         ewma
       }))
@@ -211,12 +211,13 @@ thief_rfsrc = function(y,
       }
 
       # Generate forecasted ewmas for prediction
+      cat('\nForecasting from the rfsrc\n')
       ewma_fcs <- matrix(NA, nrow = frequency * k, ncol = ncol(ewmas))
       for(w in 1:ncol(ewmas)){
         # Add Gaussian noise to forecasted moving averages for better generalizability
-        ewma_fcs[,w] <- suppressWarnings(jitter(forecast::forecast(forecast::stlf(ts(ewmas[,w],
-                                                     frequency = frequency), forecastfunction = rwf, drift = T),
-                                                  h = frequency * k)$mean, amount = 0.5))
+        ewma_fcs[,w] <- suppressWarnings(jitter(forecast::snaive(ts(ewmas[,w],
+                                                     frequency = frequency),
+                                                  h = frequency * k)$mean, amount = 0.25))
       }
       newdata <- data.frame(ewma_fcs)
       colnames(newdata) <- colnames(rf_data)[-c(1:NCOL(y))]
@@ -244,6 +245,7 @@ thief_rfsrc = function(y,
       rm(newdata, rf_data, ewmas, ewma_fcs, rf)
 
       # Loop across series and calculate forecast prediction statistics for later reconciliation
+      cat('\nCalculating prediction intervals\n')
       series_forecasts <- lapply(seq_len(ncol(y)), function(series){
         if(predict_quantiles){
           series_quantiles <- preds_quantiles[[series]]
