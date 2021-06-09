@@ -230,7 +230,7 @@ thief_rfsrc = function(y,
                                                   ntree = 1000,
                                                   nsplit = NULL,
                                                   nodesize = opt_nodesize,
-                                                  method = 'forest')
+                                                  method = 'local')
         preds_quantiles <- randomForestSRC::quantreg(object = rf_quantiles , newdata = newdata)
         preds_quantiles <- purrr::map(preds_quantiles$quantreg, 'quantiles')
         rm(rf_quantiles)
