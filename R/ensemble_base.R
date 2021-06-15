@@ -64,6 +64,8 @@ ensemble_base = function(y, frequency, lambda = 0, k = 1, bottom_series = FALSE)
   }
 
   # Try an ets model
+  if(frequency <= 24){
+
     ets_base <- try(forecast::forecast(forecast::ets(y_train),
                                        h = length(y_test)),
                     silent = TRUE)
@@ -80,6 +82,24 @@ ensemble_base = function(y, frequency, lambda = 0, k = 1, bottom_series = FALSE)
         ets_mae <- tail(as.vector(abs(residuals(ets_base))), length(y_test))
       }
     }
+  } else {
+    ets_base <- try(forecast::forecast(forecast::tbats(y_train),
+                                       h = length(y_test)),
+                    silent = TRUE)
+    if(inherits(ets_base, 'try-error')){
+      use_ets <- FALSE
+      ets_mae <- rep(NA, length(y_test))
+    } else {
+      use_ets <- TRUE
+      if(cv){
+        ets_mae <- abs(as.vector(ets_base$mean) - as.vector(y_test))
+        ets_base <- forecast::forecast(forecast::tbats(y),
+                                       h = frequency * k)
+      } else {
+        ets_mae <- tail(as.vector(abs(residuals(ets_base))), length(y_test))
+      }
+    }
+  }
 
 if(!bottom_series){
 # Try an auto.arima model

@@ -18,7 +18,7 @@
 #'@param return_aggregates \code{Logical}. If \code{TRUE}, the forecasts and residuals for the aggregate series will
 #'also be returned
 #'@param prior_aggregates Optional result of a previous call to \code{thief_reconcile} that contains the
-#'forecasts and residuals from the temporal aggregate forecasts for the same \code{y. If supplied,
+#'forecasts and residuals from the temporal aggregate forecasts for the same \code{y}. If supplied,
 #'forecasts for the temporal aggregates will not be calculated again prior to reconciliation, saving on computation.
 #'
 #'@seealso \code{\link[thief]{reconcilethief}}
@@ -53,7 +53,8 @@
 #'
 #'@export
 #'
-thief_reconcile = function(y, original_forecast,
+thief_reconcile = function(y,
+                           original_forecast,
                            forecast_residuals = NULL,
                            lambda = NULL,
                            frequency,
@@ -83,6 +84,7 @@ thief_reconcile = function(y, original_forecast,
   }
 
   series_agg <- thief::tsaggregates(series)
+
   names <- vector()
   for(j in seq_along(series_agg)){
     names[j] <- paste0('Frequency_', frequency(series_agg[[j]]))
@@ -117,6 +119,7 @@ thief_reconcile = function(y, original_forecast,
       stop('Forecast horizon must be a multiple of frequency for temporal reconciliation')
     }
     residuals[[1]] <- forecast_residuals
+    quick_fc$residuals <- forecast_residuals
     k <- ceiling(length(apply(original_forecast, 1, mean)) / frequency)
   }
 

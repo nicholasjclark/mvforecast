@@ -15,7 +15,7 @@
 #'
 #'@export
 plot_mvforecast = function(simulation, main = '', ylab = 'Y',
-                         ylim = c(min(simulation, na.rm = T), max(simulation, na.rm = T))){
+                         ylim = NULL){
 
   # Calculate prediction intervals
   forecast <- do.call(rbind, lapply(seq_len(nrow(simulation)), function(x){
@@ -32,6 +32,10 @@ plot_mvforecast = function(simulation, main = '', ylab = 'Y',
                    seventies[3], seventyfives[3], eighties[3], eightyfives[3], nineties[3], ninetyfives[3])
     quantiles
   }))
+
+  if(missing(ylim)){
+    ylim = c(min(forecast, na.rm = T), max(forecast, na.rm = T) + 5)
+  }
 
   # Create an empty plot
   if(nrow(forecast) > 20){

@@ -32,6 +32,10 @@ between \code{-1} and \code{2} inclusive. If \code{y} contains zeros, \code{lamb
 
 \item{return_aggregates}{\code{Logical}. If \code{TRUE}, the forecasts and residuals for the aggregate series will
 also be returned}
+
+\item{prior_aggregates}{Optional result of a previous call to \code{thief_reconcile} that contains the
+forecasts and residuals from the temporal aggregate forecasts for the same \code{y}. If supplied,
+forecasts for the temporal aggregates will not be calculated again prior to reconciliation, saving on computation.}
 }
 \description{
 This function fits ensemble univariate forecast models on all levels of temporal
