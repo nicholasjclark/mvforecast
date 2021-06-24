@@ -79,6 +79,11 @@ Defaults to \code{NULL}}
 
 \item{fig_path}{\code{character}. Optional filepath where fitted and residual plots will be saved. Defaults to the
 current working directory}
+
+\item{max_agg}{(optional) \code{integer} specifying the maximum number of temporal aggregation levels
+to use when reconciling, via the structural scaling method. Useful if higher levels of aggregation
+are unlikely to have 'seen' recent changes in series dynamics and will likely then result in poor
+forecasts as a result. Default is \code{NULL}, meaning that all levels of aggregation are used}
 }
 \value{
 A \code{list} containing the reconciled forecast distributions for each series in \code{y}. Each element in

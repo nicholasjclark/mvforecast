@@ -42,6 +42,10 @@
 #'\code{fig_path} if \code{TRUE}
 #'@param fig_path \code{character}. Optional filepath where fitted and residual plots will be saved. Defaults to the
 #'current working directory
+#'@param max_agg (optional) \code{integer} specifying the maximum number of temporal aggregation levels
+#'to use when reconciling, via the structural scaling method. Useful if higher levels of aggregation
+#'are unlikely to have 'seen' recent changes in series dynamics and will likely then result in poor
+#'forecasts as a result. Default is \code{NULL}, meaning that all levels of aggregation are used
 #'@return A \code{list} containing the reconciled forecast distributions for each series in \code{y}. Each element in
 #'the \code{list} is a \code{horizon x 1000 matrix} of forecast predictions
 #'
@@ -570,33 +574,39 @@ thief_vets = function(y,
     })
 
     if(!any(y < 0)){
-      series_reconciled <- try(suppressWarnings(reconcilethief_nonneg(forecasts = series_base,
-                                                                      residuals = series_resids,
-                                                                      comb = 'sam')),
+      series_reconciled <- try(suppressWarnings(reconcilethief_restrict(forecasts = series_base,
+                                                                        residuals = series_resids,
+                                                                        comb = 'sam',
+                                                                        max_agg = max_agg,
+                                                                        nonnegative = TRUE)),
                                silent = T)
       if(inherits(series_reconciled, 'try-error')){
-        series_reconciled <- try(suppressWarnings(reconcilethief_nonneg(forecasts = series_base,
-                                                                        residuals = series_resids,
-                                                                        comb = 'struc')),
+        series_reconciled <- try(suppressWarnings(reconcilethief_restrict(forecasts = series_base,
+                                                                          residuals = series_resids,
+                                                                          comb = 'struc',
+                                                                          max_agg = max_agg,
+                                                                          nonnegative = TRUE)),
                                  silent = T)
       }
 
       if(inherits(series_reconciled, 'try-error')){
-        series_reconciled <- try(suppressWarnings(thief::reconcilethief(forecasts = series_base,
-                                                                 residuals = series_resids,
-                                                                 comb = 'struc')),
+        series_reconciled <- try(suppressWarnings(reconcilethief_restrict(forecasts = series_base,
+                                                                          residuals = series_resids,
+                                                                          comb = 'struc')),
                                  silent = T)
       }
 
     } else {
-      series_reconciled <- try(suppressWarnings(thief::reconcilethief(forecasts = series_base,
-                                                               residuals = series_resids,
-                                                               comb = 'sam')),
+      series_reconciled <- try(suppressWarnings(reconcilethief_restrict(forecasts = series_base,
+                                                                        residuals = series_resids,
+                                                                        max_agg = max_agg,
+                                                                        comb = 'sam')),
                                silent = T)
       if(inherits(series_reconciled, 'try-error')){
         series_reconciled <- suppressWarnings(thief::reconcilethief(forecasts = series_base,
-                                                             residuals = series_resids,
-                                                             comb = 'struc'))
+                                                                    residuals = series_resids,
+                                                                    max_agg = max_agg,
+                                                                    comb = 'struc'))
       }
     }
 

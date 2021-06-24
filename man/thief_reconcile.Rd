@@ -11,7 +11,8 @@ thief_reconcile(
   lambda = NULL,
   frequency,
   return_aggregates = FALSE,
-  prior_aggregates = NULL
+  prior_aggregates = NULL,
+  max_agg = NULL
 )
 }
 \arguments{
@@ -36,6 +37,11 @@ also be returned}
 \item{prior_aggregates}{Optional result of a previous call to \code{thief_reconcile} that contains the
 forecasts and residuals from the temporal aggregate forecasts for the same \code{y}. If supplied,
 forecasts for the temporal aggregates will not be calculated again prior to reconciliation, saving on computation.}
+
+\item{max_agg}{(optional) \code{integer} specifying the maximum number of temporal aggregation levels
+to use when reconciling, via the structural scaling method. Useful if higher levels of aggregation
+are unlikely to have 'seen' recent changes in series dynamics and will likely then result in poor
+forecasts as a result. Default is \code{NULL}, meaning that all levels of aggregation are used}
 }
 \description{
 This function fits ensemble univariate forecast models on all levels of temporal

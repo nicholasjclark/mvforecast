@@ -16,6 +16,10 @@
 #'@param horizon \code{integer}. The horizon to forecast. Defaults to \code{frequency}
 #'@param cores \code{integer}. The number of cores to use. This is used to initialize the states of each series
 #'using \code{\link[tsets]{ets_modelspec}}
+#'@param max_agg (optional) \code{integer} specifying the maximum number of temporal aggregation levels
+#'to use when reconciling, via the structural scaling method. Useful if higher levels of aggregation
+#'are unlikely to have 'seen' recent changes in series dynamics and will likely then result in poor
+#'forecasts as a result. Default is \code{NULL}, meaning that all levels of aggregation are used
 #'@return A \code{list} containing the reconciled forecast distributions for each series in \code{y}. Each element in
 #'the \code{list} is a \code{horizon x 1000 matrix} of forecast predictions
 #'
@@ -56,7 +60,8 @@ thief_ensemble = function(y,
                       lambda = NULL,
                       frequency = 52,
                       horizon = NULL,
-                      cores = parallel::detectCores() - 1){
+                      cores = parallel::detectCores() - 1,
+                      max_agg = NULL){
 
   # Check variables
   if (!xts::is.xts(y)) {
@@ -226,32 +231,38 @@ thief_ensemble = function(y,
     })
 
     if(!any(y < 0)){
-      series_reconciled <- try(suppressWarnings(reconcilethief_nonneg(forecasts = series_base,
+      series_reconciled <- try(suppressWarnings(reconcilethief_restrict(forecasts = series_base,
                                                                   residuals = series_resids,
-                                                                  comb = 'sam')),
+                                                                  comb = 'sam',
+                                                                  max_agg = max_agg,
+                                                                  nonnegative = TRUE)),
                                silent = T)
       if(inherits(series_reconciled, 'try-error')){
-        series_reconciled <- try(suppressWarnings(reconcilethief_nonneg(forecasts = series_base,
+        series_reconciled <- try(suppressWarnings(reconcilethief_restrict(forecasts = series_base,
                                                                         residuals = series_resids,
-                                                                        comb = 'struc')),
+                                                                        comb = 'struc',
+                                                                        max_agg = max_agg,
+                                                                        nonnegative = TRUE)),
                                  silent = T)
       }
 
       if(inherits(series_reconciled, 'try-error')){
-        series_reconciled <- try(suppressWarnings(thief::reconcilethief(forecasts = series_base,
+        series_reconciled <- try(suppressWarnings(reconcilethief_restrict(forecasts = series_base,
                                                                  residuals = series_resids,
                                                                  comb = 'struc')),
                                  silent = T)
       }
 
     } else {
-      series_reconciled <- try(suppressWarnings(thief::reconcilethief(forecasts = series_base,
+      series_reconciled <- try(suppressWarnings(reconcilethief_restrict(forecasts = series_base,
                                                                residuals = series_resids,
+                                                               max_agg = max_agg,
                                                                comb = 'sam')),
                                silent = T)
       if(inherits(series_reconciled, 'try-error')){
         series_reconciled <- suppressWarnings(thief::reconcilethief(forecasts = series_base,
                                                              residuals = series_resids,
+                                                             max_agg = max_agg,
                                                              comb = 'struc'))
       }
     }

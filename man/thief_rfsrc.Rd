@@ -12,7 +12,8 @@ thief_rfsrc(
   horizon = NULL,
   predict_quantiles = TRUE,
   tune_nodesize = FALSE,
-  cores = parallel::detectCores() - 1
+  cores = parallel::detectCores() - 1,
+  max_agg = NULL
 )
 }
 \arguments{
@@ -38,6 +39,11 @@ the optimal nodesize tuning parameter for the multivariate random forest. This c
 and a nodesize of \code{10} is used}
 
 \item{cores}{\code{integer}. The number of cores to use}
+
+\item{max_agg}{(optional) \code{integer} specifying the maximum number of temporal aggregation levels
+to use when reconciling, via the structural scaling method. Useful if higher levels of aggregation
+are unlikely to have 'seen' recent changes in series dynamics and will likely then result in poor
+forecasts as a result. Default is \code{NULL}, meaning that all levels of aggregation are used}
 }
 \value{
 A \code{list} containing the reconciled forecast distributions for each series in \code{y}. Each element in

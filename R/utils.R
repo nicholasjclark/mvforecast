@@ -84,19 +84,28 @@ hpd <- function(x, coverage = 0.95)
 #' @param returnall If \code{TRUE}, a list of time series corresponding to the first argument
 #' is returned, but now reconciled. Otherwise, only the most disaggregated series is returned.
 #' @param aggregatelist (optional) User-selected list of forecast aggregates to consider
-#'
+#' @param max_agg (optional) \code{integer} specifying the maximum number of temporal aggregation levels
+#' to use when reconciling, via the structural scaling method. Useful if higher levels of aggregation
+#' are unlikely to have 'seen' recent changes in series dynamics and will likely then result in poor
+#' forecasts as a result. Default is \code{NULL}, meaning that all levels of aggregation are used
+#' @param nonnegative \code{logical} If \code{TRUE}, forecaststs are constrained using non-negative
+#' optimisation to ensure negative forecasts are eliminated. Default is \code{FALSE}
 #' @return
 #'   List of reconciled forecasts in the same format as \code{forecast}.
 #' If \code{returnall==FALSE}, only the most disaggregated series is returned.
 #' @seealso \code{\link{thief}}, \code{\link{tsaggregates}}
 #'
 #'@export
-reconcilethief_nonneg <- function(forecasts,
+reconcilethief_restrict <- function(forecasts,
                                   comb = c("struc","mse","ols","bu","shr","sam"),
                                   mse = NULL, residuals = NULL, returnall = TRUE,
-                                  aggregatelist = NULL){
+                                  aggregatelist = NULL, max_agg = NULL,
+                                  nonnegative = FALSE){
 
   comb <- match.arg(comb)
+  if(!is.null(max_agg)){
+    comb <- 'struc'
+  }
 
   # If forecasts is a list of forecast objects, then
   # extract list of forecast time series and list of residual time series
@@ -178,7 +187,22 @@ reconcilethief_nonneg <- function(forecasts,
         weights <- NULL
       else if(comb=="mse")
         weights <- 1/rep(rev(mse), rev(unsum))
-      bts <- hts::combinef(t(fmat), groups=grps, weights=weights, keep='bottom', nonnegative = T)
+
+      # Restrict levels of aggregation to use based on max_agg by setting levels above
+      # max_agg as zero weights in the structural method
+      if(!is.null(max_agg)){
+        tot_levels_agg <- length(unique(nsum))
+        if(max_agg > tot_levels_agg){
+          warning('Max agg greater than maximum level of aggregation. Ignoring')
+          max_agg <- max(nsum)
+        } else {
+          max_agg <- rev(unique(nsum))[max_agg]
+        }
+        weights[nsum > max_agg] <- 0
+      }
+
+      bts <- hts::combinef(t(fmat), groups=grps, weights=weights, keep='bottom',
+                           nonnegative = nonnegative)
     }
     else
       # GLS reconciliation
@@ -191,7 +215,7 @@ reconcilethief_nonneg <- function(forecasts,
       for(i in rev(seq_along(forecasts)))
         rmat <- rbind(rmat, matrix(residuals[[i]], ncol=nc))
       bts <- hts::MinT(t(fmat), groups=grps, residual=t(rmat),
-                       covariance=comb, keep='bottom', nonnegative = T)
+                       covariance=comb, keep='bottom', nonnegative = nonnegative)
     }
     # Turn resulting reconciled forecasts back into a ts object
     bts <- ts(c(t(bts)))

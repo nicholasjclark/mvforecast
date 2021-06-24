@@ -4,12 +4,7 @@
 \alias{plot_mvforecast}
 \title{Plot simulation predictions}
 \usage{
-plot_mvforecast(
-  simulation,
-  main = "",
-  ylab = "Y",
-  ylim = c(min(simulation, na.rm = T), max(simulation, na.rm = T))
-)
+plot_mvforecast(simulation, main = "", ylab = "Y", ylim = NULL)
 }
 \arguments{
 \item{simulation}{\code{matrix}. The forecast object, which should be a horizon x simulation \code{matrix}

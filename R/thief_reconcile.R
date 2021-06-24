@@ -20,6 +20,10 @@
 #'@param prior_aggregates Optional result of a previous call to \code{thief_reconcile} that contains the
 #'forecasts and residuals from the temporal aggregate forecasts for the same \code{y}. If supplied,
 #'forecasts for the temporal aggregates will not be calculated again prior to reconciliation, saving on computation.
+#'@param max_agg (optional) \code{integer} specifying the maximum number of temporal aggregation levels
+#'to use when reconciling, via the structural scaling method. Useful if higher levels of aggregation
+#'are unlikely to have 'seen' recent changes in series dynamics and will likely then result in poor
+#'forecasts as a result. Default is \code{NULL}, meaning that all levels of aggregation are used
 #'
 #'@seealso \code{\link[thief]{reconcilethief}}
 #'
@@ -59,7 +63,8 @@ thief_reconcile = function(y,
                            lambda = NULL,
                            frequency,
                            return_aggregates = FALSE,
-                           prior_aggregates = NULL){
+                           prior_aggregates = NULL,
+                           max_agg = NULL){
   if(missing(lambda)){
     lambda <- ifelse((length(which(y == 0)) / length(y)) > 0.1, 0.7, 1)
   }
@@ -170,32 +175,38 @@ thief_reconcile = function(y,
   })
 
   if(!any(y < 0)){
-    series_reconciled <- try(suppressWarnings(reconcilethief_nonneg(forecasts = series_base,
-                                                                    residuals = series_resids,
-                                                                    comb = 'sam')),
+    series_reconciled <- try(suppressWarnings(reconcilethief_restrict(forecasts = series_base,
+                                                                      residuals = series_resids,
+                                                                      comb = 'sam',
+                                                                      max_agg = max_agg,
+                                                                      nonnegative = TRUE)),
                              silent = T)
     if(inherits(series_reconciled, 'try-error')){
-      series_reconciled <- try(suppressWarnings(reconcilethief_nonneg(forecasts = series_base,
-                                                                      residuals = series_resids,
-                                                                      comb = 'struc')),
+      series_reconciled <- try(suppressWarnings(reconcilethief_restrict(forecasts = series_base,
+                                                                        residuals = series_resids,
+                                                                        comb = 'struc',
+                                                                        max_agg = max_agg,
+                                                                        nonnegative = TRUE)),
                                silent = T)
     }
 
     if(inherits(series_reconciled, 'try-error')){
-      series_reconciled <- try(suppressWarnings(thief::reconcilethief(forecasts = series_base,
-                                                                      residuals = series_resids,
-                                                                      comb = 'struc')),
+      series_reconciled <- try(suppressWarnings(reconcilethief_restrict(forecasts = series_base,
+                                                                        residuals = series_resids,
+                                                                        comb = 'struc')),
                                silent = T)
     }
 
   } else {
-    series_reconciled <- try(suppressWarnings(thief::reconcilethief(forecasts = series_base,
-                                                                    residuals = series_resids,
-                                                                    comb = 'sam')),
+    series_reconciled <- try(suppressWarnings(reconcilethief_restrict(forecasts = series_base,
+                                                                      residuals = series_resids,
+                                                                      max_agg = max_agg,
+                                                                      comb = 'sam')),
                              silent = T)
     if(inherits(series_reconciled, 'try-error')){
       series_reconciled <- suppressWarnings(thief::reconcilethief(forecasts = series_base,
                                                                   residuals = series_resids,
+                                                                  max_agg = max_agg,
                                                                   comb = 'struc'))
     }
   }
