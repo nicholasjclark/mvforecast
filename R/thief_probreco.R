@@ -21,6 +21,10 @@
 #'@param cores \code{integer}. The number of cores to use
 #'@param keep_total \code{logical}. If \code{TRUE}, forecasts for the the top-level summed series (the total)
 #'will also be returned as the last element in the returned list of forecast distributions
+#'@param max_agg (optional) \code{integer} specifying the maximum number of temporal aggregation levels
+#'to use when reconciling, via the structural scaling method. Useful if higher levels of aggregation
+#'are unlikely to have 'seen' recent changes in series dynamics and will likely then result in poor
+#'forecasts as a result. Default is \code{NULL}, meaning that all levels of aggregation are used
 #'@param ... Other arguments to be passed on to the specified thief model
 #'@return A \code{list} containing the reconciled forecast distributions for each series in \code{y}. Each element in
 #'the \code{list} is a \code{horizon x 1000 matrix} of forecast predictions
@@ -73,6 +77,7 @@ thief_probreco = function(y,
                           model = 'thief_ensemble',
                           prob_train_horizon = NULL,
                           horizon = NULL,
+                          max_agg = NULL,
                           groups,
                           keep_total = TRUE,
                           cores = parallel::detectCores() - 1, ...){

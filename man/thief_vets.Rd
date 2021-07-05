@@ -19,6 +19,7 @@ thief_vets(
   cores = parallel::detectCores() - 1,
   group = NULL,
   xreg = NULL,
+  max_agg = NULL,
   xreg_include = NULL,
   newxreg = NULL,
   save_plots = FALSE,
@@ -65,6 +66,11 @@ Defaults to \code{NULL}}
 
 \item{xreg}{Optional \code{xts} matrix of external regressors. Defaults to \code{NULL}}
 
+\item{max_agg}{(optional) \code{integer} specifying the maximum number of temporal aggregation levels
+to use when reconciling, via the structural scaling method. Useful if higher levels of aggregation
+are unlikely to have 'seen' recent changes in series dynamics and will likely then result in poor
+forecasts as a result. Default is \code{NULL}, meaning that all levels of aggregation are used}
+
 \item{xreg_include}{optional \code{matrix} of dimension \code{ncol(y)} by \code{ncol(xreg)} populated
 with either 0, 1 or 2+ (0 = no beta, 1 = individual beta and 2 = grouped beta). It is also
 possible to have group wise pooling. For instance 2 variables sharing one pooled estimates,
@@ -79,11 +85,6 @@ Defaults to \code{NULL}}
 
 \item{fig_path}{\code{character}. Optional filepath where fitted and residual plots will be saved. Defaults to the
 current working directory}
-
-\item{max_agg}{(optional) \code{integer} specifying the maximum number of temporal aggregation levels
-to use when reconciling, via the structural scaling method. Useful if higher levels of aggregation
-are unlikely to have 'seen' recent changes in series dynamics and will likely then result in poor
-forecasts as a result. Default is \code{NULL}, meaning that all levels of aggregation are used}
 }
 \value{
 A \code{list} containing the reconciled forecast distributions for each series in \code{y}. Each element in

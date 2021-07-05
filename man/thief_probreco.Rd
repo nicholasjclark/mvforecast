@@ -12,6 +12,7 @@ thief_probreco(
   model = "thief_ensemble",
   prob_train_horizon = NULL,
   horizon = NULL,
+  max_agg = NULL,
   groups,
   keep_total = TRUE,
   cores = parallel::detectCores() - 1,
@@ -33,6 +34,11 @@ between \code{-1} and \code{2} inclusive. If \code{y_series} contains zeros, \co
 \item{model}{One of code{c(thief_ensemble, thief_rfsrc, thief_vets)}}
 
 \item{horizon}{\code{integer}. The horizon to forecast. Defaults to \code{frequency}}
+
+\item{max_agg}{(optional) \code{integer} specifying the maximum number of temporal aggregation levels
+to use when reconciling, via the structural scaling method. Useful if higher levels of aggregation
+are unlikely to have 'seen' recent changes in series dynamics and will likely then result in poor
+forecasts as a result. Default is \code{NULL}, meaning that all levels of aggregation are used}
 
 \item{groups}{Group matrix indicates the group structure, with one column for each series when
 completely disaggregated, and one row or each grouping of the time series. It allows either a numerical matrix or a
