@@ -469,7 +469,7 @@ thief_rfsrc = function(y,
                                                                         comb = 'sam')),
                                silent = T)
       if(inherits(series_reconciled, 'try-error')){
-        series_reconciled <- suppressWarnings(thief::reconcilethief(forecasts = series_base,
+        series_reconciled <- suppressWarnings(reconcilethief_restrict(forecasts = series_base,
                                                                     residuals = series_resids,
                                                                     max_agg = max_agg,
                                                                     comb = 'struc'))
