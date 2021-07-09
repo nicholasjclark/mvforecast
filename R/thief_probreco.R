@@ -111,6 +111,7 @@ if(model == 'thief_rfsrc'){
                                   k = ceiling(prob_train_horizon / frequency),
                                   horizon = prob_train_horizon,
                                   cores = cores,
+                                  max_agg = max_agg,
                                   ...)
 }
 
@@ -122,6 +123,7 @@ if(model == 'thief_vets'){
                                      frequency = frequency,
                                      horizon = prob_train_horizon,
                                      cores = cores,
+                                     max_agg = max_agg,
                                      group = groups, ...), silent = T)
 
   # Errors will occur if there aren't enough seasonal periods in the data for ETS
@@ -134,6 +136,7 @@ if(model == 'thief_vets'){
                                     k = ceiling(prob_train_horizon / frequency),
                                     horizon = prob_train_horizon,
                                     cores = cores,
+                                    max_agg = max_agg,
                                     ...)
   }
 }
@@ -144,6 +147,7 @@ if(model == 'thief_ensemble'){
                                      frequency = frequency,
                                      k = ceiling(prob_train_horizon / frequency),
                                      cores = cores,
+                                     max_agg = max_agg,
                                      horizon = prob_train_horizon)
 }
 
@@ -164,6 +168,7 @@ group_reconciled <- thief_ensemble(y = all_agg_series,
                                    frequency = frequency,
                                    cores = cores,
                                    k = ceiling(prob_train_horizon / frequency),
+                                   max_agg = max_agg,
                                    horizon = prob_train_horizon)
 
 # Get realisations from the out of sample test set for all series
@@ -229,6 +234,7 @@ if(model == 'thief_rfsrc'){
                                   k = ceiling(horizon / frequency),
                                   horizon = horizon,
                                   cores = cores,
+                                  max_agg = max_agg,
                                   ...)
 }
 
@@ -240,6 +246,7 @@ if(model == 'thief_vets'){
                                      frequency = frequency,
                                      horizon = horizon,
                                      cores = cores,
+                                     max_agg = max_agg,
                                      group = groups, ...), silent = T)
 
   # Errors will occur if there aren't enough seasonal periods in the data for ETS
@@ -251,6 +258,7 @@ if(model == 'thief_vets'){
                                     cores = cores,
                                     frequency = frequency,
                                     k = ceiling(horizon / frequency),
+                                    max_agg = max_agg,
                                     horizon = horizon, ...)
   }
 }
@@ -261,6 +269,7 @@ if(model == 'thief_ensemble'){
                                      cores = cores,
                                      frequency = frequency,
                                      k = ceiling(horizon / frequency),
+                                     max_agg = max_agg,
                                      horizon = horizon)
 }
 
@@ -281,6 +290,7 @@ group_reconciled <- thief_ensemble(y = all_agg_series,
                                    frequency = frequency,
                                    k = ceiling(horizon / frequency),
                                    horizon = horizon,
+                                   max_agg = max_agg,
                                    cores = cores)
 
 # Extract future forecast distributions for all series
