@@ -87,15 +87,6 @@ thief_rfsrc = function(y,
     }
   }
 
-  # Automatically set lambda if missing. If many zeros are present in the bottom series, use 0.7, which gives
-  # good stability and balances overconfidence of prediction intervals. Otherwise use 1, which does not
-  # transform the series but shifts it by -1 (https://otexts.com/fpp2/transformations.html)
-  if(missing(lambda)){
-    lambda <- ifelse((length(which(y[,1] == 0)) / length(y[,1])) > 0.1, 0.7, 1)
-  }
-
-  lambda <- ifelse(any(as.vector(y[,1]) == 0), max(c(0.7, lambda)), lambda)
-
   if(!is.null(lambda)){
     if(lambda < -1 || lambda > 2) stop('lambda must be between -1 and 2 inclusive')
   }

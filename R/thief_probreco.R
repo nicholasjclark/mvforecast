@@ -178,14 +178,14 @@ y_ts_test <- do.call(cbind,lapply(seq_len(ncol(y_test)), function(x){
 colnames(y_ts_test) <- colnames(y_test)
 test <- hts::gts(y_ts_test, groups = t(matrix(groups)), gnames = 'species')
 aggregated_series_test <- hts::aggts(test)[,1:(ncol(hts::aggts(test)) - ncol(y_ts))]
-data_matrix <- rbind(t(aggregated_series_test[1:nrow(y_test),]),
+data_matrix <- rbind(t(aggregated_series_test[1:NROW(y_test),]),
                      as.matrix(t(y_test)))
 reco_data <- lapply(seq_len(NCOL(data_matrix)), function(y){
   matrix(data_matrix[,y])
 })
 
 # Gather probabilistic distributions for base and grouped series
-prob_distributions <- lapply(seq_len(nrow(y_test)), function(h){
+prob_distributions <- lapply(seq_len(NROW(y_test)), function(h){
   rbind(do.call(rbind, lapply(seq_along(group_reconciled), function(x){
     t(group_reconciled[[x]][h, ])
   })),
@@ -217,7 +217,7 @@ opt <- ProbReco::scoreopt(reco_data,
                           reco_prob,
                           S,
                           score = list(score = 'energy', alpha = 1),
-                          control = list(maxIter = 500, tol = 1E-08),
+                          control = list(maxIter = 1000, tol = 1E-08),
                           matches = TRUE)
 
 # Generate distributions for the out-of-sample testing period

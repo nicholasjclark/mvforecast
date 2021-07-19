@@ -26,13 +26,11 @@
 #'@return A \code{list} object containing the ensemble forecast and the ensemble residuals
 #'
 #'@export
-ensemble_base = function(y, frequency, lambda = 0, k = 1, bottom_series = FALSE){
+ensemble_base = function(y, frequency, lambda = NULL, k = 1, bottom_series = FALSE){
 
-  # Automatically set lambda if missing. If many zeros are present, use 0.7, which seems to give
-  # good stability and balances overconfidence of prediction intervals. Otherwise use 1, which does not
-  # transform the series but shifts it by -1 (https://otexts.com/fpp2/transformations.html)
+  # Automatically set lambda if missing
   if(missing(lambda)){
-    lambda <- ifelse((length(which(y == 0)) / length(y)) > 0.1, 0.7, 1)
+    lambda <- forecast::BoxCox.lambda(y)
   }
 
  lambda <- ifelse(any(as.vector(y) == 0), max(c(0.7, lambda)), lambda)

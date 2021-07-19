@@ -126,7 +126,7 @@ thief_vets = function(y,
                       slope = "none",
                       damped = "none",
                       seasonal = "common",
-                      lambda = 1,
+                      lambda = NULL,
                       dependence = "equicorrelation",
                       frequency = 52,
                       horizon = NULL,
@@ -628,6 +628,19 @@ thief_vets = function(y,
 
     if(horizon < frequency){
       new_distribution <- new_distribution[1:horizon,]
+    }
+
+    new_distribution <- do.call(rbind, lapply(seq_len(nrow(new_distribution)), function(x){
+      if(length(unique(new_distribution[x,])) == 1){
+        out <- rnorm(ncol(new_distribution), unique(new_distribution[x,]), 0.5)
+      } else {
+        out <- new_distribution[x,]
+      }
+      out
+    }))
+
+    if(!any(y < 0)){
+      new_distribution[new_distribution < 0] <- 0
     }
     new_distribution
 

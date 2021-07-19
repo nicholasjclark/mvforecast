@@ -10,8 +10,7 @@
 #'@param k \code{integer} specifying the length of the forecast horizon in multiples of \code{frequency}. Default
 #'is \code{1}, meaning that a final forecast of \code{frequency} horizons will be returned
 #'@param lambda \code{numeric}. The Box Cox power transformation parameter for all series. Must be
-#'between \code{-1} and \code{2} inclusive. If \code{y_series} contains zeros, \code{lambda} will be set to
-#'\code{max(c(0.7, lambda))} to ensure stability of forecasts
+#'between \code{-1} and \code{2} inclusive
 #'@param frequency \code{integer}. The seasonal frequency in \code{y}
 #'@param horizon \code{integer}. The horizon to forecast. Defaults to \code{frequency}
 #'@param cores \code{integer}. The number of cores to use. This is used to initialize the states of each series
@@ -76,15 +75,6 @@ thief_ensemble = function(y,
     ynames <- colnames(y)
   }
   }
-
-  # Automatically set lambda if missing. If many zeros are present in the bottom series, use 0.7, which gives
-  # good stability and balances overconfidence of prediction intervals. Otherwise use 1, which does not
-  # transform the series but shifts it by -1 (https://otexts.com/fpp2/transformations.html)
-  if(missing(lambda)){
-    lambda <- ifelse((length(which(y[,1] == 0)) / length(y[,1])) > 0.1, 0.7, 1)
-  }
-
-  lambda <- ifelse(any(as.vector(y[,1]) == 0), max(c(0.7, lambda)), lambda)
 
   if(!is.null(lambda)){
     if(lambda < -1 || lambda > 2) stop('lambda must be between -1 and 2 inclusive')
