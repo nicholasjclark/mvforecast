@@ -203,7 +203,7 @@ thief_vets = function(y,
     # Store copula details and random draws from each series' estimated discrete distribution
     copula_details <- vector(mode = 'list')
 
-    # Let the multivariate BoxCox parameter be estimated
+    # Set the multivariate BoxCox parameter to NULL for no transformation
     lambda <- NULL
   }
 
@@ -217,7 +217,7 @@ thief_vets = function(y,
 
       # Estimate copula parameters from most recent values of y so the
       # returned discrete distribution is more reflective of recent history
-      dist_params <- copula_params(tail(series, min(length(series), frequency * 4)),
+      dist_params <- copula_params(tail(series, min(length(series), 100)),
                                    non_neg = T, censor = 0.99)$params
 
       # The transformed y (approximately Gaussian following PIT transformation)

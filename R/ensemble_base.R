@@ -43,14 +43,14 @@ ensemble_base = function(y, frequency, lambda = NULL, k = 1, bottom_series = FAL
 
     # Estimate copula parameters from most recent values of y so the
     # returned discrete distribution is more reflective of recent history
-    dist_params <- copula_params(tail(y, min(length(y), frequency * 4)),
+    dist_params <- copula_params(tail(y, min(length(y), 100)),
                                  non_neg = T, censor = 0.99)$params
 
     # The transformed y (approximately Gaussian following PIT transformation)
     y <- copula_y$y_trans
 
-    # Set BoxCox transformation parameter
-    lambda <- forecast::BoxCox.lambda(y)
+    # Set BoxCox transformation parameter to 1 for no transformation
+    lambda <- 1
 
     # Take random draws from the estimated discrete distribution so predictions can be mapped
     # back to the original data distribution
@@ -64,7 +64,11 @@ ensemble_base = function(y, frequency, lambda = NULL, k = 1, bottom_series = FAL
 
   # Automatically set lambda if missing
   if(missing(lambda)){
-    lambda <- forecast::BoxCox.lambda(y)
+    if(any(y < 0)){
+      lambda <- 1
+    } else {
+      lambda <- forecast::BoxCox.lambda(y)
+    }
     lambda <- ifelse(any(as.vector(y) == 0), max(c(0.7, lambda)), lambda)
   }
 
@@ -262,9 +266,9 @@ if(!bottom_series){
 }
 
 
-if(any(which(apply(maes, 2, FUN = function(x) length(which(is.na(x)))) == nrow(maes)))){
+if(any(which(apply(maes, 2, FUN = function(x) length(which(is.na(x)))) == NROW(maes)))){
   maes <- maes[,-which(apply(maes, 2, FUN = function(x)
-    length(which(is.na(x)))) == nrow(maes))]
+    length(which(is.na(x)))) == NROW(maes))]
 }
 
 # Scale against the snaive model to convert the MAE to MASE
@@ -275,13 +279,13 @@ maes <- maes + 1 / (snaive_mae + 1)
 
 # Define the function to minimise
 opt_mae <- function(weights, maes) {
-  mean.default(unlist(lapply(seq_len(nrow(maes)), function(h){
+  mean.default(unlist(lapply(seq_len(NROW(maes)), function(h){
     weighted.mean(maes[h,], weights)
   }), use.names = FALSE))
 }
 
 # Use optimisation to minimise the function
-weights <- rbeta(ncol(maes), 1, 1)
+weights <- rbeta(NCOL(maes), 1, 1)
 opt <- optim(weights,
              opt_mae,
              maes = maes,
@@ -294,31 +298,31 @@ names(ens_weights) <- colnames(maes)
 weight_fcs = function(fcs, ens_weights){
   means <- do.call(cbind, lapply(seq_along(fcs), function(x){
     as.vector(fcs[[x]]$mean)}))
-  ens_mean <- unlist(lapply(seq_len(nrow(means)), function(x){
+  ens_mean <- unlist(lapply(seq_len(NROW(means)), function(x){
     weighted.mean(means[x,], ens_weights)}), use.names = F)
   rm(means)
 
   upper_95s <- do.call(cbind, lapply(seq_along(fcs), function(x){
     as.vector(fcs[[x]]$upper[,2])}))
-  ens_upper95 <- unlist(lapply(seq_len(nrow(upper_95s)), function(x){
+  ens_upper95 <- unlist(lapply(seq_len(NROW(upper_95s)), function(x){
     weighted.mean(upper_95s[x,], ens_weights)}), use.names = F)
   rm(upper_95s)
 
   upper_80s <- do.call(cbind, lapply(seq_along(fcs), function(x){
     as.vector(fcs[[x]]$upper[,1])}))
-  ens_upper80 <- unlist(lapply(seq_len(nrow(upper_80s)), function(x){
+  ens_upper80 <- unlist(lapply(seq_len(NROW(upper_80s)), function(x){
     weighted.mean(upper_80s[x,], ens_weights)}), use.names = F)
   rm(upper_80s)
 
   lower_95s <- do.call(cbind, lapply(seq_along(fcs), function(x){
     as.vector(fcs[[x]]$lower[,2])}))
-  ens_lower95 <- unlist(lapply(seq_len(nrow(lower_95s)), function(x){
+  ens_lower95 <- unlist(lapply(seq_len(NROW(lower_95s)), function(x){
     weighted.mean(lower_95s[x,], ens_weights)}), use.names = F)
   rm(lower_95s)
 
   lower_80s <- do.call(cbind, lapply(seq_along(fcs), function(x){
     as.vector(fcs[[x]]$lower[,1])}))
-  ens_lower80 <- unlist(lapply(seq_len(nrow(lower_80s)), function(x){
+  ens_lower80 <- unlist(lapply(seq_len(NROW(lower_80s)), function(x){
     weighted.mean(lower_80s[x,], ens_weights)}), use.names = F)
   rm(lower_80s)
 
@@ -343,7 +347,7 @@ weight_fcs = function(fcs, ens_weights){
       as.vector(fcs[[x]]$fitted)
     }))
   rm(fcs)
-  ens_fitted <- unlist(lapply(seq_len(nrow(fitted)), function(x){
+  ens_fitted <- unlist(lapply(seq_len(NROW(fitted)), function(x){
     weighted.mean(fitted[x,], ens_weights)}), use.names = F)
   residuals <- ens_fitted - y
   residuals[is.na(residuals)] <- 0

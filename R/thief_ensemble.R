@@ -103,13 +103,15 @@ thief_ensemble = function(y,
   if(discrete){
     # Store copula details and random draws from each series' estimated discrete distribution
     copula_details <- vector(mode = 'list')
-
-    # Let the multivariate BoxCox parameter be estimated
-    lambda <- NULL
+    lambda <- 1
   }
 
-  for(i in 1:ncol(y)){
-    series <- xts.to.ts(y[, i], freq = frequency)
+  for(i in 1:NCOL(y)){
+    if(NCOL(y) > 1){
+      series <- xts.to.ts(y[, i], freq = frequency)
+    } else {
+      series <- xts.to.ts(y, freq = frequency)
+    }
 
     # Transform to approximate Gaussian if discrete = TRUE
     if(discrete){
@@ -118,7 +120,7 @@ thief_ensemble = function(y,
 
       # Estimate copula parameters from most recent values of y so the
       # returned discrete distribution is more reflective of recent history
-      dist_params <- copula_params(tail(series, min(length(series), frequency * 4)),
+      dist_params <- copula_params(tail(series, min(length(series), 100)),
                                    non_neg = T, censor = 0.99)$params
 
       # The transformed y (approximately Gaussian following PIT transformation)
@@ -179,6 +181,7 @@ thief_ensemble = function(y,
                           'y'),
                   envir = environment())
     clusterEvalQ(cl, library(forecast))
+    clusterEvalQ(cl, library(mvforecast))
     clusterEvalQ(cl, library(zoo))
     clusterEvalQ(cl, library(xts))
 
@@ -192,8 +195,8 @@ thief_ensemble = function(y,
                                                        lambda = lambda,
                                                        frequency = frequencies[i],
                                                        k = k,
-                                                       bottom_series = FALSE)), silent = TRUE)
-
+                                                       discrete = FALSE,
+                                                       bottom_series = FALSE)), silent = T)
         if(inherits(ensemble, 'try-error')){
           outcome_base[[j]] <- forecast::forecast(outcomes[[i]][,j],
                                                h = k * frequencies[i])
@@ -225,7 +228,8 @@ thief_ensemble = function(y,
                                     lambda = lambda,
                                     frequency = frequencies[i],
                                     k = k,
-                                    bottom_series = FALSE)), silent = TRUE)
+                                    discrete = FALSE,
+                                    bottom_series = FALSE)), silent = F)
 
           if(inherits(ensemble, 'try-error')){
             base[[i]][[j]] <- forecast::forecast(outcomes[[i]][,j],
@@ -244,7 +248,7 @@ thief_ensemble = function(y,
 
   # Reconcile the forecasts, use non-negative optimisation constraints if there are no negatives present in y
   cat('\nReconciling original forecasts')
-  reconciled <- lapply(seq_len(ncol(y)), function(series){
+  reconciled <- lapply(seq_len(NCOL(y)), function(series){
     series_base <- lapply(seq_along(outcomes), function(x){
       base[[x]][[series]]
     })
@@ -308,7 +312,7 @@ thief_ensemble = function(y,
   adjusted_distributions <- lapply(seq_len(ncol(y)), function(series){
     orig_distribution <- do.call(rbind, lapply(seq_len(nrow(base[[1]][[series]]$upper)), function(y){
       rnorm(1000, mean = base[[1]][[series]]$mean[y],
-            sd = abs(base[[1]][[series]]$upper[y,2] - base[[1]][[series]]$mean[y]) / 1.46)
+            sd = abs(base[[1]][[series]]$upper[y,2] - base[[1]][[series]]$mean[y]))
     }))
     adjustment <- as.numeric(reconciled[[series]]$mean - base[[1]][[series]]$mean)
 
@@ -340,3 +344,4 @@ thief_ensemble = function(y,
   names(adjusted_distributions) <- colnames(y)
   return(adjusted_distributions)
 }
+

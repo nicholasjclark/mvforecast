@@ -130,7 +130,7 @@ thief_probreco = function(y,
 
       # Estimate copula parameters from most recent values of y so the
       # returned discrete distribution is more reflective of recent history
-      dist_params <- copula_params(tail(series, min(length(series), frequency * 4)),
+      dist_params <- copula_params(tail(series, min(length(series), 100)),
                                    non_neg = T, censor = 0.99)$params
 
       # The transformed y (approximately Gaussian following PIT transformation)
