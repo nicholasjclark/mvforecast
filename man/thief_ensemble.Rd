@@ -11,7 +11,8 @@ thief_ensemble(
   frequency = 52,
   horizon = NULL,
   cores = parallel::detectCores() - 1,
-  max_agg = NULL
+  max_agg = NULL,
+  discrete = FALSE
 )
 }
 \arguments{
@@ -21,8 +22,7 @@ thief_ensemble(
 is \code{1}, meaning that a final forecast of \code{frequency} horizons will be returned}
 
 \item{lambda}{\code{numeric}. The Box Cox power transformation parameter for all series. Must be
-between \code{-1} and \code{2} inclusive. If \code{y_series} contains zeros, \code{lambda} will be set to
-\code{max(c(0.7, lambda))} to ensure stability of forecasts}
+between \code{-1} and \code{2} inclusive}
 
 \item{frequency}{\code{integer}. The seasonal frequency in \code{y}}
 
@@ -35,6 +35,10 @@ using \code{\link[tsets]{ets_modelspec}}}
 to use when reconciling, via the structural scaling method. Useful if higher levels of aggregation
 are unlikely to have 'seen' recent changes in series dynamics and will likely then result in poor
 forecasts as a result. Default is \code{NULL}, meaning that all levels of aggregation are used}
+
+\item{discrete}{\code{logical} Is the series in \code{y} discrete? If \code{TRUE}, use a copula-based method
+relying on the Probability Integral Transform to map the series to an approximate Gaussian distribution prior to modelling.
+Forecasts are then back-transformed to the estimated discrete distribution that best fits \code{y}. Default is \code{FALSE}}
 }
 \value{
 A \code{list} containing the reconciled forecast distributions for each series in \code{y}. Each element in

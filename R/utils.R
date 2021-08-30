@@ -1,3 +1,172 @@
+# Estimate parameters of a Negative Binomial distribution
+#'
+#'This function is a wrapper for \code{\link[MASS]{fitdistr}} to generate estimates of Negative Binomial parameters
+#'
+#'@param x \code{vector} of values representing the discrete count vector
+#'@return A \code{list} of estimates for the mean and size parameters from a \code{\link[MASS]{fitdistr}} object
+#'
+#'@export
+#'
+nb_params = function(x){
+  MASS::fitdistr(x, densfun = "negative binomial")$estimate
+}
+
+# Estimate parameters of a Poisson distribution
+#'
+#'This function is a wrapper for \code{\link[MASS]{fitdistr}} to generate estimates of Poisson parameters
+#'
+#'@param x \code{vector} of values representing the discrete count vector
+#'@return A \code{numeric} estimate for the mean parameter from a \code{\link[MASS]{fitdistr}} object
+#'
+#'@export
+#'
+poiss_params = function(x){
+  MASS::fitdistr(x, densfun = "poisson")$estimate
+}
+
+# Transform a count vector to the Uniform distribution using the Inverse Probability Distribution Function
+#'
+#'For discrete series, Probability Integral Transform sampling maps observations onto a Uniform distribution that is then mapped
+#'onto a Gaussian distribution for modelling. This is essentially a copula method where we assume the 'marginal'
+#'is a discrete distribution. This function ranks \code{log(x + 0.01)} transformed values of \code{x} to generate
+#'the Uniform(0,1) marginal and then uses \code{\link[stats]{qnorm}} to map these onto an approximately Gaussian
+#'distribution
+#'@param x \code{vector} of values representing the discrete count vector
+#'@return A \code{vector} of approximately Gaussian PIT-transformed values
+#'
+#'@export
+#'
+paranorm = function(x){
+  ranks <- data.table::frank(log2(x + 0.01))
+  stats::qnorm(ranks / (length(x) + 1))
+}
+
+# Estimate copula parameters for a discrete series and return the approximately Gaussian series
+#'
+#'For discrete series, Probability Integral Transform sampling maps observations onto a Uniform distribution that is then mapped
+#'onto a Gaussian distribution for modelling. This is essentially a copula method where we assume the 'marginal'
+#'is a discrete distribution. This function determines whether a Poisson or Negative Binomial is more appropriate for the series
+#'and then generates the approximately Gaussian PIT-transformed values of the series.
+#'@param y \code{ts} object containing the discrete time series. \code{NA}s are allowed and will be interpolated using a combination of
+#'\code{\link[zoo]{rollmean}} and \code{\link[forecast]{na.interp}}
+#'@param non_neg \code{logical} indicating whether the series is restricted to be non-negative. Default is \code{TRUE}
+#'@param censor \code{numeric} value ranging \code{0 - 1} indicating the upper quantile of values to truncate high outliers to
+#'prior to estimating discrete distribution parameters. Useful when large outliers an lead to inflated estimates of
+#'the distribution mean. Default is \code{0.99}
+#'@param k \code{integer} indicating the  width of the rolling window to use for smoothly interpolating missing values. See more in
+#'\code{\link[zoo]{rollmean}}
+#'@return A \code{list} containing the original series with missing values interpolated, the approximately Gaussian transformed
+#'series and the estimated discrete distribution parameter(s)
+#'
+#'@export
+#'
+copula_params = function(y, non_neg = TRUE, censor = 0.99, k = 2){
+  # Remove effect of large outliers, which can lead to inflated estimates of
+  # the distribution mean
+  y[y > quantile(y, censor, na.rm = T)] <- quantile(y, censor, na.rm = T)
+
+  # Use smooth interpolation of any NAs, rather than solely using forecast::na.interp (which fills NAs
+  # based on STL decompositions and could be wildly inaccurate in some cases)
+  y_discrete <- forecast::na.interp(zoo::rollmean(zoo::na.approx(y, na.rm = F), k = k, fill = NA))
+  y_discrete <- round(as.vector(y_discrete), 0)
+
+  if(non_neg){
+    y_discrete[y_discrete < 0] <- 0
+  }
+
+  # Calculate raw discrete distribution parameters
+  suppressWarnings(params <- try(nb_params(as.vector(y_discrete)), silent = TRUE))
+
+  if(inherits(params, 'try-error')){
+    suppressWarnings(params <- poiss_params(as.vector(y_discrete)))
+  }
+
+  # Transform y to approximately Gaussian using the PIT transformation
+  y_trans <- ts(paranorm(as.vector(y_discrete)), start = start(y),
+                frequency = frequency(y))
+
+  return(list(y_discrete = y_discrete, y_trans = y_trans, params = params))
+}
+
+# Back-transform an approximately Gaussian series to the original discrete scale
+#'
+#'For discrete series, Probability Integral Transform sampling maps observations onto a Uniform distribution that is then mapped
+#'onto a Gaussian distribution for modelling. This is essentially a copula method where we assume the 'marginal'
+#'is a discrete distribution. This function takes an approximately Gaussian series, usually a prediction from a model,
+#'and back-transforms it to the discrete distribution that was originally estimated.
+#'@param x \code{vector} containing the approximately Gaussian values to be back-transformed
+#'@param dist_mappings \code{vector} containing random draws from the original discrete distribution. This set of draws is used for
+#'estimating rankings of \code{x} and so it should be large enough (\code{N >= 5000}) to represent the full discrete distribution
+#'@param params the original estimated discrete distribution parameter(s). If the original was Negative Binomially distributed,
+#'\code{params} will be a \code{list} of \code{length} \code{2}.
+#'@return A \code{vector} containing the estimated discrete values for \code{x}
+#'
+#'@export
+#'
+back_trans = function(x, dist_mappings, params){
+  # Rank x against PIT-transformed values from dist_mappings
+  x <- as.vector(x)
+  ranks <- data.table::frank(c(x, paranorm(dist_mappings)))
+  ranks <- ranks / (max(ranks) + 1)
+
+  # Keep only the first x values from the rankings
+  ranks <- ranks[1:length(x)]
+
+  # Back-transform the ranked x-values to either the Negative Binomial
+  if(length(params) == 2){
+    x_trans <- stats::qnbinom(p = ranks,
+                              size = params[1],
+                              mu = params[2])
+    # Or the Poisson distribution
+  } else {
+    x_trans <- stats::qpois(p = ranks, lambda = params)
+  }
+
+  x_trans
+}
+
+# Back-transform an approximately Gaussian forecast to the original discrete scale
+#'
+#'For discrete series, Probability Integral Transform sampling maps observations onto a Uniform distribution that is then mapped
+#'onto a Gaussian distribution for modelling. This is essentially a copula method where we assume the 'marginal'
+#'is a discrete distribution. This function takes an approximately Gaussian forecast object
+#'and back-transforms it to the discrete distribution that was originally estimated.
+#'@param forecast \code{forecast} object containing the approximately Gaussian predictions to be back-transformed
+#'@param orig_y \code{vector} containing the original untransformed y values
+#'@param dist_mappings \code{vector} containing random draws from the original discrete distribution. This set of draws is used for
+#'estimating rankings of \code{x} and so it should be large enough (\code{N >= 5000}) to represent the full discrete distribution
+#'@param params the original estimated discrete distribution parameter(s). If the original was Negative Binomially distributed,
+#'\code{params} will be a \code{list} of \code{length} \code{2}.
+#'@return A \code{forecast} containing the estimated discrete predictions
+#'
+#'@export
+#'
+transform_fc_preds = function(forecast, orig_y, dist_mappings, dist_params){
+  new_fc <- forecast
+  new_fc$mean <- ts(back_trans(as.vector(forecast$mean),
+                               dist_mappings, dist_params),
+                    start = start(forecast$mean),
+                    frequency = frequency(forecast$mean))
+  new_fc$upper[,1] <- ts(back_trans(as.vector(forecast$upper[,1]),
+                                    dist_mappings, dist_params),
+                         start = start(forecast$mean),
+                         frequency = frequency(forecast$mean))
+  new_fc$upper[,2] <- ts(back_trans(as.vector(forecast$upper[,2]),
+                                    dist_mappings, dist_params),
+                         start = start(forecast$mean),
+                         frequency = frequency(forecast$mean))
+  new_fc$lower[,1] <- ts(back_trans(as.vector(forecast$lower[,1]),
+                                    dist_mappings, dist_params),
+                         start = start(forecast$mean),
+                         frequency = frequency(forecast$mean))
+  new_fc$lower[,2] <- ts(back_trans(as.vector(forecast$lower[,2]),
+                                    dist_mappings, dist_params),
+                         start = start(forecast$mean),
+                         frequency = frequency(forecast$mean))
+  new_fc$x <- ts(orig_y, start = start(forecast$x), frequency = frequency(forecast$x))
+  new_fc
+}
+
 # Calculate the highest posterior density interval
 #'
 #'This function uses estimated densities to calculate HPD intevals. Code originally supplied by Martyn Plummer

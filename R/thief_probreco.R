@@ -13,6 +13,12 @@
 #'between \code{-1} and \code{2} inclusive. If \code{y_series} contains zeros, \code{lambda} will be set to
 #'\code{max(c(0.7, lambda))} to ensure stability of forecasts
 #'@param model One of code{c(thief_ensemble, thief_rfsrc, thief_vets)}
+#'@param prob_train_horizon \code{integer} specifying the number of observations to holdout of \code{y} for training the
+#'probabilistic reconciliation weights. Models are first fitted to a subset of \code{y} that has removed the last
+#'\code{prob_train_horizon} observations, and these are used as cross-validation observations to train the reconciliation weights.
+#'Once trained, models are refitted to the full series in \code{y} and forecasts are used alongside reconciliation weights to
+#'formulate the reconciled forecast. Should be \code{>1} to provide at least some variation to \code{\link[ProbReco]{scoreopt}}.
+#'Default is \code{2}
 #'@param frequency \code{integer}. The seasonal frequency in \code{y}
 #'@param horizon \code{integer}. The horizon to forecast. Defaults to \code{frequency}
 #'@param groups Group matrix indicates the group structure, with one column for each series when
@@ -25,6 +31,9 @@
 #'to use when reconciling, via the structural scaling method. Useful if higher levels of aggregation
 #'are unlikely to have 'seen' recent changes in series dynamics and will likely then result in poor
 #'forecasts as a result. Default is \code{NULL}, meaning that all levels of aggregation are used
+#'#'@param discrete \code{logical} Is the series in \code{y} discrete? If \code{TRUE}, use a copula-based method
+#'relying on the Probability Integral Transform to map the series to an approximate Gaussian distribution prior to modelling.
+#'Forecasts are then back-transformed to the estimated discrete distribution that best fits \code{y}. Default is \code{FALSE}
 #'@param ... Other arguments to be passed on to the specified thief model
 #'@return A \code{list} containing the reconciled forecast distributions for each series in \code{y}. Each element in
 #'the \code{list} is a \code{horizon x 1000 matrix} of forecast predictions
@@ -75,16 +84,22 @@ thief_probreco = function(y,
                           frequency = 52,
                           lambda = NULL,
                           model = 'thief_ensemble',
-                          prob_train_horizon = NULL,
+                          prob_train_horizon = 2,
                           horizon = NULL,
                           max_agg = NULL,
                           groups,
                           keep_total = TRUE,
-                          cores = parallel::detectCores() - 1, ...){
+                          cores = parallel::detectCores() - 1,
+                          discrete = FALSE,
+                          ...){
 
 # Check variables
   if (!xts::is.xts(y)) {
     stop("y must be an xts object")
+  }
+
+  if(missing(groups)){
+    stop("no groups provided")
   }
 
   model <- match.arg(arg = model[1],
@@ -96,6 +111,47 @@ thief_probreco = function(y,
     ts(as.numeric(x),
        start = c(lubridate::year(start(x)),
                  start_time), freq = freq)
+  }
+
+  if(discrete){
+    # Store copula details and random draws from each series' estimated discrete distribution
+    y_PIT <- vector(mode = 'list')
+    copula_details <- vector(mode = 'list')
+
+    # Let the multivariate BoxCox parameter be estimated
+    lambda <- NULL
+
+  for(i in 1:ncol(y)){
+    series <- xts.to.ts(y[, i], freq = frequency)
+
+    # Transform to approximate Gaussian if discrete = TRUE
+      # Convert y to PIT-approximate Gaussian following censoring and NA interpolation
+      copula_y <- copula_params(series, non_neg = T, censor = 0.99)
+
+      # Estimate copula parameters from most recent values of y so the
+      # returned discrete distribution is more reflective of recent history
+      dist_params <- copula_params(tail(series, min(length(series), frequency * 4)),
+                                   non_neg = T, censor = 0.99)$params
+
+      # The transformed y (approximately Gaussian following PIT transformation)
+      y_PIT[[i]] <- copula_y$y_trans
+
+      # Take random draws from the estimated discrete distribution so predictions can be mapped
+      # back to the original data distribution
+      if(length(dist_params) == 2){
+        dist_mappings <- stats::rnbinom(5000, size = dist_params[1],
+                                        mu = dist_params[2])
+      } else {
+        dist_mappings <- stats::rpois(5000, lambda = dist_params)
+      }
+      copula_details[[i]] <- list(copula_y = copula_y,
+                                  dist_params = dist_params,
+                                  dist_mappings = dist_mappings)
+  }
+    y_PIT <- zoo::as.zoo(do.call(cbind, y_PIT))
+    y_PIT <- xts::xts(y_PIT, lubridate::date_decimal(zoo::index(y_PIT)))
+    colnames(y_PIT) <- colnames(y)
+    y <- y_PIT
   }
 
 # Split y so that last prob_train_horizon is used for training probabilistic weights
@@ -112,6 +168,7 @@ if(model == 'thief_rfsrc'){
                                   horizon = prob_train_horizon,
                                   cores = cores,
                                   max_agg = max_agg,
+                                  discrete = FALSE,
                                   ...)
 }
 
@@ -124,7 +181,9 @@ if(model == 'thief_vets'){
                                      horizon = prob_train_horizon,
                                      cores = cores,
                                      max_agg = max_agg,
-                                     group = groups, ...), silent = T)
+                                     group = groups,
+                                     discrete = FALSE,
+                                     ...), silent = T)
 
   # Errors will occur if there aren't enough seasonal periods in the data for ETS
   # Use thief_rfsrc if this happens, as this is still a multivariate base model
@@ -137,6 +196,7 @@ if(model == 'thief_vets'){
                                     horizon = prob_train_horizon,
                                     cores = cores,
                                     max_agg = max_agg,
+                                    discrete = FALSE,
                                     ...)
   }
 }
@@ -148,7 +208,8 @@ if(model == 'thief_ensemble'){
                                      k = ceiling(prob_train_horizon / frequency),
                                      cores = cores,
                                      max_agg = max_agg,
-                                     horizon = prob_train_horizon)
+                                     horizon = prob_train_horizon,
+                                     discrete = FALSE)
 }
 
 # Calculate aggregated group series, including the final total
@@ -169,7 +230,8 @@ group_reconciled <- thief_ensemble(y = all_agg_series,
                                    cores = cores,
                                    k = ceiling(prob_train_horizon / frequency),
                                    max_agg = max_agg,
-                                   horizon = prob_train_horizon)
+                                   horizon = prob_train_horizon,
+                                   discrete = FALSE)
 
 # Get realisations from the out of sample test set for all series
 y_ts_test <- do.call(cbind,lapply(seq_len(ncol(y_test)), function(x){
@@ -235,6 +297,7 @@ if(model == 'thief_rfsrc'){
                                   horizon = horizon,
                                   cores = cores,
                                   max_agg = max_agg,
+                                  discrete = FALSE,
                                   ...)
 }
 
@@ -247,7 +310,9 @@ if(model == 'thief_vets'){
                                      horizon = horizon,
                                      cores = cores,
                                      max_agg = max_agg,
-                                     group = groups, ...), silent = T)
+                                     group = groups,
+                                     discrete = FALSE,
+                                     ...), silent = T)
 
   # Errors will occur if there aren't enough seasonal periods in the data for ETS
   # Use thief_rfsrc if this happens, as this is still a multivariate base model
@@ -259,7 +324,9 @@ if(model == 'thief_vets'){
                                     frequency = frequency,
                                     k = ceiling(horizon / frequency),
                                     max_agg = max_agg,
-                                    horizon = horizon, ...)
+                                    horizon = horizon,
+                                    discrete = FALSE,
+                                    ...)
   }
 }
 
@@ -270,7 +337,8 @@ if(model == 'thief_ensemble'){
                                      frequency = frequency,
                                      k = ceiling(horizon / frequency),
                                      max_agg = max_agg,
-                                     horizon = horizon)
+                                     horizon = horizon,
+                                     discrete = FALSE)
 }
 
 # Generate aggregates for the full supplied y data
@@ -291,7 +359,8 @@ group_reconciled <- thief_ensemble(y = all_agg_series,
                                    k = ceiling(horizon / frequency),
                                    horizon = horizon,
                                    max_agg = max_agg,
-                                   cores = cores)
+                                   cores = cores,
+                                   discrete = FALSE)
 
 # Extract future forecast distributions for all series
 new_prob_distributions <- lapply(seq_len(nrow(y_forecast_probs[[1]])), function(h){
@@ -314,10 +383,22 @@ optimised_base <- lapply(seq_len(nrow(y_forecast_probs[[1]])), function(h){
     base_opt <- base_opt[-c(1: ncol(aggregated_series_test)),]
   }
 
-  if(!any(y < 0)){
+  if(!any(y < 0) & !discrete){
     base_opt[base_opt < 0] <- 0
   }
-  base_opt
+
+  if(discrete){
+    # Back-transform the predictions to the estimated discrete distribution
+    fcast_vec <- as.vector(base_opt)
+    predictions <- back_trans(fcast_vec,
+                              copula_details[[series]]$dist_mappings,
+                              copula_details[[series]]$dist_params)
+    out <- matrix(data = predictions, ncol = ncol(base_opt), nrow = nrow(base_opt))
+  } else {
+    out <- base_opt
+  }
+  out
+
 })
 
 # Put reconciled forecast distributions into correct format

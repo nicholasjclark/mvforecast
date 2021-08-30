@@ -4,7 +4,14 @@
 \alias{ensemble_base}
 \title{Fit a series of univariate models and return a weighted ensemble forecast}
 \usage{
-ensemble_base(y, frequency, lambda = 0, k = 1, bottom_series = FALSE)
+ensemble_base(
+  y,
+  frequency,
+  lambda = NULL,
+  k = 1,
+  bottom_series = FALSE,
+  discrete = FALSE
+)
 }
 \arguments{
 \item{y}{A \code{ts} object containing the series to forecast}
@@ -19,6 +26,10 @@ between \code{-1} and \code{2} inclusive. If \code{y} contains zeros, \code{lamb
 
 \item{bottom_series}{\code{logical}. If \code{TRUE}, the two \code{auto.arima} models will be ignored
 to ensure bottom level series forecasts are not overconfident}
+
+\item{discrete}{\code{logical} Is the series in \code{y} discrete? If \code{TRUE}, use a copula-based method
+relying on the Probability Integral Transform to map the series to an approximate Gaussian distribution prior to modelling.
+Forecasts are then back-transformed to the estimated discrete distribution that best fits \code{y}. Default is \code{FALSE}}
 }
 \value{
 A \code{list} object containing the ensemble forecast and the ensemble residuals

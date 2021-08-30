@@ -11,6 +11,9 @@
 #'@param k \code{integer} specifying the length of the forecast horizon in multiples of \code{frequency}
 #'@param bottom_series \code{logical}. If \code{TRUE}, the two \code{auto.arima} models will be ignored
 #'to ensure bottom level series forecasts are not overconfident
+#'@param discrete \code{logical} Is the series in \code{y} discrete? If \code{TRUE}, use a copula-based method
+#'relying on the Probability Integral Transform to map the series to an approximate Gaussian distribution prior to modelling.
+#'Forecasts are then back-transformed to the estimated discrete distribution that best fits \code{y}. Default is \code{FALSE}
 #'@details A total of seven simple univariate models are tested on the series. These include
 #'\code{\link[forecast]{stlf}} with an AR model for the seasonally-adjusted series,
 #'\code{\link[forecast]{ets}},
@@ -26,14 +29,44 @@
 #'@return A \code{list} object containing the ensemble forecast and the ensemble residuals
 #'
 #'@export
-ensemble_base = function(y, frequency, lambda = NULL, k = 1, bottom_series = FALSE){
+ensemble_base = function(y, frequency, lambda = NULL, k = 1, bottom_series = FALSE, discrete = FALSE){
+
+  # Check variables
+  if (!is.ts(y)) {
+    stop("y must be an ts object")
+  }
+
+  # Transform to approximate Gaussian if discrete = TRUE
+  if(discrete){
+    # Convert y to PIT-approximate Gaussian following censoring and NA interpolation
+    copula_y <- copula_params(y, non_neg = T, censor = 0.99)
+
+    # Estimate copula parameters from most recent values of y so the
+    # returned discrete distribution is more reflective of recent history
+    dist_params <- copula_params(tail(y, min(length(y), frequency * 4)),
+                                 non_neg = T, censor = 0.99)$params
+
+    # The transformed y (approximately Gaussian following PIT transformation)
+    y <- copula_y$y_trans
+
+    # Set BoxCox transformation parameter
+    lambda <- forecast::BoxCox.lambda(y)
+
+    # Take random draws from the estimated discrete distribution so predictions can be mapped
+    # back to the original data distribution
+    if(length(dist_params) == 2){
+      dist_mappings <- stats::rnbinom(5000, size = dist_params[1],
+                                      mu = dist_params[2])
+    } else {
+      dist_mappings <- stats::rpois(5000, lambda = dist_params)
+    }
+  }
 
   # Automatically set lambda if missing
   if(missing(lambda)){
     lambda <- forecast::BoxCox.lambda(y)
+    lambda <- ifelse(any(as.vector(y) == 0), max(c(0.7, lambda)), lambda)
   }
-
- lambda <- ifelse(any(as.vector(y) == 0), max(c(0.7, lambda)), lambda)
 
  if(!is.null(lambda)){
    if(lambda < -1 || lambda > 2) stop('lambda must be between -1 and 2 inclusive')
@@ -44,7 +77,7 @@ ensemble_base = function(y, frequency, lambda = NULL, k = 1, bottom_series = FAL
   y_test <- rep(NA, c(length(y), frequency * k)[which.min(c(0, (frequency * k) - length(y)))])
 
   # Try a stlf model
-  stlf_base <- try(forecast::forecast(forecast::stlf(y_train, forecastfunction = ar),
+  stlf_base <- try(forecast::forecast(forecast::stlm(y_train, modelfunction = ar),
                                       h = length(y_test)),
                    silent = TRUE)
   if(inherits(stlf_base, 'try-error')){
@@ -54,7 +87,7 @@ ensemble_base = function(y, frequency, lambda = NULL, k = 1, bottom_series = FAL
     use_stlf <- TRUE
     if(cv){
       stlf_mae <- abs(as.vector(stlf_base$mean) - as.vector(y_test))
-      stlf_base <- forecast::forecast(forecast::stlf(y, forecastfunction = ar),
+      stlf_base <- forecast::forecast(forecast::stlm(y, modelfunction = ar),
                                       h = frequency * k)
     } else {
       stlf_mae <- tail(as.vector(abs(residuals(stlf_base))), length(y_test))
@@ -348,5 +381,26 @@ rm(fcs, ens_weights, maes,
    snaive_base)
 
 # Return the ensemble forecast and residuals
-return(list(forecast = .subset2(ensemble, 1), residuals = .subset2(ensemble, 2)))
+if(discrete){
+
+  # Transform the forecast and residuals to the estimated discrete distribution
+  trans_fc <- transform_fc_preds(.subset2(ensemble, 1),
+                                 copula_y$y_discrete, dist_mappings, dist_params)
+  if(length(dist_params) == 2){
+    trans_resids <- ts(back_trans(as.vector(.subset2(ensemble, 2)),
+                                  dist_mappings, dist_params) - dist_params[2],
+                       start = start(.subset2(ensemble, 2)),
+                       frequency = frequency(.subset2(ensemble, 2)))
+  } else {
+    trans_resids <- ts(back_trans(as.vector(.subset2(ensemble, 2)),
+                                  dist_mappings, dist_params) - dist_params,
+                       start = start(.subset2(ensemble, 2)),
+                       frequency = frequency(.subset2(ensemble, 2)))
+  }
+  output <- list(forecast = trans_fc, residuals = trans_resids)
+
+} else {
+  output <- list(forecast = .subset2(ensemble, 1), residuals = .subset2(ensemble, 2))
+}
+return(output)
 }

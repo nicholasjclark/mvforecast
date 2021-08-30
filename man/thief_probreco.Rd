@@ -10,12 +10,13 @@ thief_probreco(
   frequency = 52,
   lambda = NULL,
   model = "thief_ensemble",
-  prob_train_horizon = NULL,
+  prob_train_horizon = 2,
   horizon = NULL,
   max_agg = NULL,
   groups,
   keep_total = TRUE,
   cores = parallel::detectCores() - 1,
+  discrete = FALSE,
   ...
 )
 }
@@ -33,12 +34,22 @@ between \code{-1} and \code{2} inclusive. If \code{y_series} contains zeros, \co
 
 \item{model}{One of code{c(thief_ensemble, thief_rfsrc, thief_vets)}}
 
+\item{prob_train_horizon}{\code{integer} specifying the number of observations to holdout of \code{y} for training the
+probabilistic reconciliation weights. Models are first fitted to a subset of \code{y} that has removed the last
+\code{prob_train_horizon} observations, and these are used as cross-validation observations to train the reconciliation weights.
+Once trained, models are refitted to the full series in \code{y} and forecasts are used alongside reconciliation weights to
+formulate the reconciled forecast. Should be \code{>1} to provide at least some variation to \code{\link[ProbReco]{scoreopt}}.
+Default is \code{2}}
+
 \item{horizon}{\code{integer}. The horizon to forecast. Defaults to \code{frequency}}
 
 \item{max_agg}{(optional) \code{integer} specifying the maximum number of temporal aggregation levels
 to use when reconciling, via the structural scaling method. Useful if higher levels of aggregation
 are unlikely to have 'seen' recent changes in series dynamics and will likely then result in poor
-forecasts as a result. Default is \code{NULL}, meaning that all levels of aggregation are used}
+forecasts as a result. Default is \code{NULL}, meaning that all levels of aggregation are used
+#'@param discrete \code{logical} Is the series in \code{y} discrete? If \code{TRUE}, use a copula-based method
+relying on the Probability Integral Transform to map the series to an approximate Gaussian distribution prior to modelling.
+Forecasts are then back-transformed to the estimated discrete distribution that best fits \code{y}. Default is \code{FALSE}}
 
 \item{groups}{Group matrix indicates the group structure, with one column for each series when
 completely disaggregated, and one row or each grouping of the time series. It allows either a numerical matrix or a

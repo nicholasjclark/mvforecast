@@ -12,7 +12,7 @@ thief_vets(
   slope = "none",
   damped = "none",
   seasonal = "common",
-  lambda = 1,
+  lambda = NULL,
   dependence = "equicorrelation",
   frequency = 52,
   horizon = NULL,
@@ -23,7 +23,8 @@ thief_vets(
   xreg_include = NULL,
   newxreg = NULL,
   save_plots = FALSE,
-  fig_path = ""
+  fig_path = "",
+  discrete = FALSE
 )
 }
 \arguments{
@@ -85,6 +86,10 @@ Defaults to \code{NULL}}
 
 \item{fig_path}{\code{character}. Optional filepath where fitted and residual plots will be saved. Defaults to the
 current working directory}
+
+\item{discrete}{\code{logical} Is the series in \code{y} discrete? If \code{TRUE}, use a copula-based method
+relying on the Probability Integral Transform to map the series to an approximate Gaussian distribution prior to modelling.
+Forecasts are then back-transformed to the estimated discrete distribution that best fits \code{y}. Default is \code{FALSE}}
 }
 \value{
 A \code{list} containing the reconciled forecast distributions for each series in \code{y}. Each element in

@@ -19,6 +19,9 @@
 #'to use when reconciling, via the structural scaling method. Useful if higher levels of aggregation
 #'are unlikely to have 'seen' recent changes in series dynamics and will likely then result in poor
 #'forecasts as a result. Default is \code{NULL}, meaning that all levels of aggregation are used
+#'@param discrete \code{logical} Is the series in \code{y} discrete? If \code{TRUE}, use a copula-based method
+#'relying on the Probability Integral Transform to map the series to an approximate Gaussian distribution prior to modelling.
+#'Forecasts are then back-transformed to the estimated discrete distribution that best fits \code{y}. Default is \code{FALSE}
 #'@return A \code{list} containing the reconciled forecast distributions for each series in \code{y}. Each element in
 #'the \code{list} is a \code{horizon x 1000 matrix} of forecast predictions
 #'
@@ -60,7 +63,8 @@ thief_ensemble = function(y,
                       frequency = 52,
                       horizon = NULL,
                       cores = parallel::detectCores() - 1,
-                      max_agg = NULL){
+                      max_agg = NULL,
+                      discrete = FALSE){
 
   # Check variables
   if (!xts::is.xts(y)) {
@@ -95,8 +99,44 @@ thief_ensemble = function(y,
 
   # Construct all temporal aggregates for each series in y
   tsagg <- vector(mode = 'list')
-  for(i in 1:n){
+
+  if(discrete){
+    # Store copula details and random draws from each series' estimated discrete distribution
+    copula_details <- vector(mode = 'list')
+
+    # Let the multivariate BoxCox parameter be estimated
+    lambda <- NULL
+  }
+
+  for(i in 1:ncol(y)){
     series <- xts.to.ts(y[, i], freq = frequency)
+
+    # Transform to approximate Gaussian if discrete = TRUE
+    if(discrete){
+      # Convert y to PIT-approximate Gaussian following censoring and NA interpolation
+      copula_y <- copula_params(series, non_neg = T, censor = 0.99)
+
+      # Estimate copula parameters from most recent values of y so the
+      # returned discrete distribution is more reflective of recent history
+      dist_params <- copula_params(tail(series, min(length(series), frequency * 4)),
+                                   non_neg = T, censor = 0.99)$params
+
+      # The transformed y (approximately Gaussian following PIT transformation)
+      series <- copula_y$y_trans
+
+      # Take random draws from the estimated discrete distribution so predictions can be mapped
+      # back to the original data distribution
+      if(length(dist_params) == 2){
+        dist_mappings <- stats::rnbinom(5000, size = dist_params[1],
+                                        mu = dist_params[2])
+      } else {
+        dist_mappings <- stats::rpois(5000, lambda = dist_params)
+      }
+      copula_details[[i]] <- list(copula_y = copula_y,
+                                  dist_params = dist_params,
+                                  dist_mappings = dist_mappings)
+    }
+
     series_agg <- thief::tsaggregates(series)
     names <- vector()
     for(j in seq_along(series_agg)){
@@ -221,7 +261,7 @@ thief_ensemble = function(y,
              amount = 0.001)
     })
 
-    if(!any(y < 0)){
+    if(!any(y < 0) & !discrete){
       series_reconciled <- try(suppressWarnings(reconcilethief_restrict(forecasts = series_base,
                                                                   residuals = series_resids,
                                                                   comb = 'sam',
@@ -273,15 +313,26 @@ thief_ensemble = function(y,
     adjustment <- as.numeric(reconciled[[series]]$mean - base[[1]][[series]]$mean)
 
     new_distribution <- sweep(orig_distribution, 1, adjustment, "+")
-    #new_distribution <- orig_distribution + adjustment
-    if(!any(y < 0)){
+
+    if(!any(y < 0) & !discrete){
       new_distribution[new_distribution < 0] <- 0
     }
 
     if(horizon < frequency){
       new_distribution <- new_distribution[1:horizon,]
     }
-    new_distribution
+
+    if(discrete){
+      # Back-transform the predictions to the estimated discrete distribution
+      fcast_vec <- as.vector(new_distribution)
+      predictions <- back_trans(fcast_vec,
+                                copula_details[[series]]$dist_mappings,
+                                copula_details[[series]]$dist_params)
+      out <- matrix(data = predictions, ncol = ncol(new_distribution), nrow = nrow(new_distribution))
+    } else {
+      out <- new_distribution
+    }
+    out
 
   })
 
