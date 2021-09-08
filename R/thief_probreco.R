@@ -124,29 +124,14 @@ thief_probreco = function(y,
   for(i in 1:ncol(y)){
     series <- xts.to.ts(y[, i], freq = frequency)
 
-    # Transform to approximate Gaussian if discrete = TRUE
-      # Convert y to PIT-approximate Gaussian following censoring and NA interpolation
-      copula_y <- copula_params(series, non_neg = T, censor = 0.99)
+    # Convert y to PIT-approximate Gaussian following censoring and NA interpolation
+    copula_y <- copula_params(series)
 
-      # Estimate copula parameters from most recent values of y so the
-      # returned discrete distribution is more reflective of recent history
-      dist_params <- copula_params(tail(series, min(length(series), 100)),
-                                   non_neg = T, censor = 0.99)$params
+    # The transformed y (approximately Gaussian following PIT transformation)
+    series <- copula_y$y_trans
 
-      # The transformed y (approximately Gaussian following PIT transformation)
-      y_PIT[[i]] <- copula_y$y_trans
-
-      # Take random draws from the estimated discrete distribution so predictions can be mapped
-      # back to the original data distribution
-      if(length(dist_params) == 2){
-        dist_mappings <- stats::rnbinom(5000, size = dist_params[1],
-                                        mu = dist_params[2])
-      } else {
-        dist_mappings <- stats::rpois(5000, lambda = dist_params)
-      }
-      copula_details[[i]] <- list(copula_y = copula_y,
-                                  dist_params = dist_params,
-                                  dist_mappings = dist_mappings)
+    copula_details[[i]] <- list(copula_y = copula_y,
+                                dist_params = copula_y$params)
   }
     y_PIT <- zoo::as.zoo(do.call(cbind, y_PIT))
     y_PIT <- xts::xts(y_PIT, lubridate::date_decimal(zoo::index(y_PIT)))
@@ -196,8 +181,7 @@ if(model == 'thief_vets'){
                                     horizon = prob_train_horizon,
                                     cores = cores,
                                     max_agg = max_agg,
-                                    discrete = FALSE,
-                                    ...)
+                                    discrete = FALSE)
   }
 }
 
@@ -325,8 +309,7 @@ if(model == 'thief_vets'){
                                     k = ceiling(horizon / frequency),
                                     max_agg = max_agg,
                                     horizon = horizon,
-                                    discrete = FALSE,
-                                    ...)
+                                    discrete = FALSE)
   }
 }
 
@@ -387,17 +370,7 @@ optimised_base <- lapply(seq_len(nrow(y_forecast_probs[[1]])), function(h){
     base_opt[base_opt < 0] <- 0
   }
 
-  if(discrete){
-    # Back-transform the predictions to the estimated discrete distribution
-    fcast_vec <- as.vector(base_opt)
-    predictions <- back_trans(fcast_vec,
-                              copula_details[[series]]$dist_mappings,
-                              copula_details[[series]]$dist_params)
-    out <- matrix(data = predictions, ncol = ncol(base_opt), nrow = nrow(base_opt))
-  } else {
-    out <- base_opt
-  }
-  out
+ base_opt
 
 })
 
@@ -408,6 +381,21 @@ reconciled_base <- lapply(seq_len(nrow(optimised_base[[1]])), function(x){
   }))
   all
 })
+
+if(discrete){
+    reconciled_base <- lapply(seq_along(reconciled_base), function(x){
+      if(x <= NCOL(original_y)){
+        # Back-transform the predictions to the estimated discrete distribution
+        fcast_vec <- as.vector(reconciled_base[[x]])
+        predictions <- back_trans(x = fcast_vec,
+                                  params = copula_details[[x]]$dist_params)
+        out <- matrix(data = predictions, ncol = ncol(reconciled_base[[x]]), nrow = nrow(reconciled_base[[x]]))
+      } else {
+        out <- reconciled_base[[x]]
+      }
+      out
+    })
+}
 
 # Return the reconciled forecast distributions for each series in y as a list
 if(keep_total){

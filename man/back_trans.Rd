@@ -7,16 +7,20 @@ onto a Gaussian distribution for modelling. This is essentially a copula method 
 is a discrete distribution. This function takes an approximately Gaussian series, usually a prediction from a model,
 and back-transforms it to the discrete distribution that was originally estimated.}
 \usage{
-back_trans(x, dist_mappings, params)
+back_trans(x, dist_mappings, params, params_sd = 0)
 }
 \arguments{
 \item{x}{\code{vector} containing the approximately Gaussian values to be back-transformed}
 
 \item{dist_mappings}{\code{vector} containing random draws from the original discrete distribution. This set of draws is used for
-estimating rankings of \code{x} and so it should be large enough (\code{N >= 5000}) to represent the full discrete distribution}
+estimating rankings of \code{x} and so it should be large enough (\code{N >= 1000}) to represent the full discrete distribution.
+If missing, the \code{params_sd} estimates will be used to generate random draws from the discrete distribution to
+capture uncertainty}
 
 \item{params}{the original estimated discrete distribution parameter(s). If the original was Negative Binomially distributed,
 \code{params} will be a \code{list} of \code{length} \code{2}.}
+
+\item{params_sd}{the estimated standard deviation(s) of \code{params}}
 }
 \value{
 A \code{vector} containing the estimated discrete values for \code{x}

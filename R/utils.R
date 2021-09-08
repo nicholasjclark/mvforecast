@@ -8,7 +8,7 @@
 #'@export
 #'
 nb_params = function(x){
-  MASS::fitdistr(x, densfun = "negative binomial")$estimate
+  MASS::fitdistr(x, densfun = "negative binomial")
 }
 
 # Estimate parameters of a Poisson distribution
@@ -21,7 +21,7 @@ nb_params = function(x){
 #'@export
 #'
 poiss_params = function(x){
-  MASS::fitdistr(x, densfun = "poisson")$estimate
+  MASS::fitdistr(x, densfun = "poisson")
 }
 
 # Transform a count vector to the Uniform distribution using the Inverse Probability Distribution Function
@@ -37,8 +37,9 @@ poiss_params = function(x){
 #'@export
 #'
 paranorm = function(x){
-  ranks <- data.table::frank(log2(x + 0.01))
-  stats::qnorm(ranks / (length(x) + 1))
+  ranks <- data.table::frank(log2(x + 0.01), ties.method = 'max')
+  pit_vals <- stats::qnorm(ranks / (length(x) + 1), sd = 2)
+  return(pit_vals)
 }
 
 # Estimate copula parameters for a discrete series and return the approximately Gaussian series
@@ -60,7 +61,7 @@ paranorm = function(x){
 #'
 #'@export
 #'
-copula_params = function(y, non_neg = TRUE, censor = 0.99, k = 2){
+copula_params = function(y, non_neg = TRUE, censor = 1, k = 1){
   # Remove effect of large outliers, which can lead to inflated estimates of
   # the distribution mean
   y[y > quantile(y, censor, na.rm = T)] <- quantile(y, censor, na.rm = T)
@@ -81,11 +82,25 @@ copula_params = function(y, non_neg = TRUE, censor = 0.99, k = 2){
     suppressWarnings(params <- poiss_params(as.vector(y_discrete)))
   }
 
+  # Get random draws from estimated distribution
+  if(length(params$estimate) == 2){
+    dist_mappings <- stats::qnbinom(p = seq(0, 0.99999999, length.out = 10000),
+                                    size = params$estimate[1],
+                                    mu = params$estimate[2])
+  } else {
+    dist_mappings <- stats::qpois(p = seq(0, 0.99999999, length.out = 10000),
+                                  lambda = params$estimate)
+  }
+
   # Transform y to approximately Gaussian using the PIT transformation
-  y_trans <- ts(paranorm(as.vector(y_discrete)), start = start(y),
+  para_dist <- paranorm(c(as.vector(y_discrete), dist_mappings))
+  y_trans <- ts(para_dist[1:length(y_discrete)],
+                start = start(y),
                 frequency = frequency(y))
 
-  return(list(y_discrete = y_discrete, y_trans = y_trans, params = params))
+  return(list(y_discrete = y_discrete,
+              y_trans = y_trans,
+              params = params$estimate))
 }
 
 # Back-transform an approximately Gaussian series to the original discrete scale
@@ -95,34 +110,42 @@ copula_params = function(y, non_neg = TRUE, censor = 0.99, k = 2){
 #'is a discrete distribution. This function takes an approximately Gaussian series, usually a prediction from a model,
 #'and back-transforms it to the discrete distribution that was originally estimated.
 #'@param x \code{vector} containing the approximately Gaussian values to be back-transformed
-#'@param dist_mappings \code{vector} containing random draws from the original discrete distribution. This set of draws is used for
-#'estimating rankings of \code{x} and so it should be large enough (\code{N >= 5000}) to represent the full discrete distribution
 #'@param params the original estimated discrete distribution parameter(s). If the original was Negative Binomially distributed,
 #'\code{params} will be a \code{list} of \code{length} \code{2}.
 #'@return A \code{vector} containing the estimated discrete values for \code{x}
 #'
 #'@export
 #'
-back_trans = function(x, dist_mappings, params){
-  # Rank x against PIT-transformed values from dist_mappings
-  x <- as.vector(x)
-  ranks <- data.table::frank(c(x, paranorm(dist_mappings)))
-  ranks <- ranks / (max(ranks) + 1)
+back_trans = function(x, params){
 
-  # Keep only the first x values from the rankings
-  ranks <- ranks[1:length(x)]
-
-  # Back-transform the ranked x-values to either the Negative Binomial
-  if(length(params) == 2){
-    x_trans <- stats::qnbinom(p = ranks,
-                              size = params[1],
-                              mu = params[2])
-    # Or the Poisson distribution
-  } else {
-    x_trans <- stats::qpois(p = ranks, lambda = params)
+  # Map forecast onto a logistic curve to respect the multiplicative nature of
+  # quantile changes
+  soft_boundary = function(x){
+    x * pnorm(10/abs(x), sd = 2)
   }
 
-  x_trans
+  probs <- pnorm(as.vector(soft_boundary(x)), sd = 2)
+
+  # No forecasts at top quantile or it will return Inf
+  if(any(probs == 1)){
+    probs[probs == 1] <- 0.999999
+  }
+
+   if(length(params) == 2){
+          x_trans <- stats::qnbinom(p = probs,
+                                    size = params[1],
+                                    mu = params[2])
+
+  } else {
+        x_trans <- stats::qpois(p = probs, lambda = params[1])
+  }
+
+  if(any(is.infinite(x_trans))){
+    x_trans[is.infinite(x_trans)] <- max(x_trans, na.rm = T)
+  }
+
+  return(x_trans)
+
 }
 
 # Back-transform an approximately Gaussian forecast to the original discrete scale
@@ -133,38 +156,44 @@ back_trans = function(x, dist_mappings, params){
 #'and back-transforms it to the discrete distribution that was originally estimated.
 #'@param forecast \code{forecast} object containing the approximately Gaussian predictions to be back-transformed
 #'@param orig_y \code{vector} containing the original untransformed y values
-#'@param dist_mappings \code{vector} containing random draws from the original discrete distribution. This set of draws is used for
-#'estimating rankings of \code{x} and so it should be large enough (\code{N >= 5000}) to represent the full discrete distribution
 #'@param params the original estimated discrete distribution parameter(s). If the original was Negative Binomially distributed,
 #'\code{params} will be a \code{list} of \code{length} \code{2}.
 #'@return A \code{forecast} containing the estimated discrete predictions
 #'
 #'@export
 #'
-transform_fc_preds = function(forecast, orig_y, dist_mappings, dist_params){
+transform_fc_preds = function(forecast, orig_y,
+                              params){
   new_fc <- forecast
-  new_fc$mean <- ts(back_trans(as.vector(forecast$mean),
-                               dist_mappings, dist_params),
-                    start = start(forecast$mean),
-                    frequency = frequency(forecast$mean))
-  new_fc$upper[,1] <- ts(back_trans(as.vector(forecast$upper[,1]),
-                                    dist_mappings, dist_params),
-                         start = start(forecast$mean),
-                         frequency = frequency(forecast$mean))
-  new_fc$upper[,2] <- ts(back_trans(as.vector(forecast$upper[,2]),
-                                    dist_mappings, dist_params),
-                         start = start(forecast$mean),
-                         frequency = frequency(forecast$mean))
-  new_fc$lower[,1] <- ts(back_trans(as.vector(forecast$lower[,1]),
-                                    dist_mappings, dist_params),
-                         start = start(forecast$mean),
-                         frequency = frequency(forecast$mean))
-  new_fc$lower[,2] <- ts(back_trans(as.vector(forecast$lower[,2]),
-                                    dist_mappings, dist_params),
-                         start = start(forecast$mean),
-                         frequency = frequency(forecast$mean))
-  new_fc$x <- ts(orig_y, start = start(forecast$x), frequency = frequency(forecast$x))
-  new_fc
+
+  all_trans <- back_trans(c(new_fc$mean,
+                            new_fc$upper[,1],
+                            new_fc$upper[,2],
+                            new_fc$lower[,1],
+                            new_fc$lower[,2]),
+                          params = params)
+    indices <- c(seq(1, length(all_trans), by = length(new_fc$mean)))
+    starts <- indices
+    ends <- c(indices[-1]-1, length(all_trans))
+
+
+    new_fc$mean <- ts(all_trans[starts[1]:ends[1]],
+                      start = start(forecast$mean),
+                      frequency = frequency(forecast$mean))
+    new_fc$upper[,1] <- ts(all_trans[starts[2]:ends[2]],
+                           start = start(forecast$mean),
+                           frequency = frequency(forecast$mean))
+    new_fc$upper[,2] <- ts(all_trans[starts[3]:ends[3]],
+                           frequency = frequency(forecast$mean))
+    new_fc$lower[,1] <- ts(all_trans[starts[4]:ends[4]],
+                           start = start(forecast$mean),
+                           frequency = frequency(forecast$mean))
+    new_fc$lower[,2] <- ts(all_trans[starts[5]:ends[5]],
+                           start = start(forecast$mean),
+                           frequency = frequency(forecast$mean))
+    new_fc$x <- ts(orig_y, start = start(forecast$x), frequency = frequency(forecast$x))
+
+ return(new_fc)
 }
 
 # Calculate the highest posterior density interval

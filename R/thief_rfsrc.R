@@ -125,27 +125,13 @@ thief_rfsrc = function(y,
     # Transform to approximate Gaussian if discrete = TRUE
     if(discrete){
       # Convert y to PIT-approximate Gaussian following censoring and NA interpolation
-      copula_y <- copula_params(series, non_neg = T, censor = 0.99)
-
-      # Estimate copula parameters from most recent values of y so the
-      # returned discrete distribution is more reflective of recent history
-      dist_params <- copula_params(tail(series, min(length(series), 100)),
-                                   non_neg = T, censor = 0.99)$params
+      copula_y <- copula_params(series)
 
       # The transformed y (approximately Gaussian following PIT transformation)
       series <- copula_y$y_trans
 
-      # Take random draws from the estimated discrete distribution so predictions can be mapped
-      # back to the original data distribution
-      if(length(dist_params) == 2){
-        dist_mappings <- stats::rnbinom(5000, size = dist_params[1],
-                                        mu = dist_params[2])
-      } else {
-        dist_mappings <- stats::rpois(5000, lambda = dist_params)
-      }
       copula_details[[i]] <- list(copula_y = copula_y,
-                                  dist_params = dist_params,
-                                  dist_mappings = dist_mappings)
+                                  dist_params = copula_y$params)
     }
 
     series_agg <- thief::tsaggregates(series)
@@ -184,33 +170,50 @@ thief_rfsrc = function(y,
       cat('\nFitting a rfsrc model to series with frequency', frequency,'\n')
 
       # Get a dataframe of the series
-      rf_data <- data.frame(y)
+      rf_data <- data.frame(do.call(cbind, lapply(seq_along(tsagg), function(x){tsagg[[x]][[1]]})))
+      colnames(rf_data) <- colnames(y)
 
-      # Calculate exponentially weighted moving averages of each series to include as features
+      # Add in columns for the total aggregate and medians to build additional features
+      total <- rowSums(rf_data)
+      medians <- apply(rf_data, 1, function(x) quantile(x, probs = 0.5, na.rm = T))
+      rf_data$Overall_total <- total
+      rf_data$Overall_median <- medians
+
+      # Calculate exponentially weighted moving averages of each series (and the total) as features
       ewma_filter <- function (x, ratio) {
         c(stats::filter(x * ratio, 1 - ratio, "recursive", init = x[1]))
       }
 
+      # Set rolling window sizes for calculating ewmas
       if(frequency >= 12){
-        windows <- unique(ceiling(seq(3, frequency / 2, length.out = 3)))
+        windows <- unique(ceiling(seq(4, frequency / 2, length.out = 3)))
       } else if (frequency >= 6) {
-        windows <- unique(ceiling(seq(1, frequency / 2, length.out = 2)))
+        windows <- unique(ceiling(seq(2, frequency / 2, length.out = 2)))
       } else {
         windows <- unique(seq(1, frequency, length.out = 2))
       }
 
-      ewmas <- do.call(cbind, lapply(seq_len(ncol(y)), function(x){
+      # Remove outliers and scale each series prior to calculating ewmas
+      scale_truncate = function(x){
+        x[x > quantile(x, 0.95)] <- quantile(x, 0.95)
+        x[x < quantile(x, 0.05)] <- quantile(x, 0.05)
+        scale(x)
+      }
+
+      ewmas <- do.call(cbind, lapply(seq_len(ncol(rf_data)), function(x){
         ewma <- matrix(NA, nrow = length(y[,1]), ncol = length(windows))
         for(w in seq_along(windows)){
-          ewma[,w] <- suppressWarnings(jitter(ewma_filter(as.vector(zoo::rollmean(y[,x],
-                                                                 k = ceiling(windows[w] ^ 0.8),
+          ewma[,w] <- suppressWarnings(jitter(ewma_filter(forecast::na.interp(as.vector(zoo::rollmean(scale_truncate(rf_data[,x]),
+                                                                 k = windows[w],
                                                                  na.pad = TRUE,
-                                                                 fill = 0)),
-                                         ratio = (2 / (windows[w] + 1))), amount = 0.25))
+                                                                 fill = NA))),
+                                         ratio = (2 / (windows[w] + 1))), amount = 0.025))
         }
         ewma
       }))
       rf_data <- cbind(rf_data, ewmas)
+      rf_data$Overall_total <- NULL
+      rf_data$Overall_median <- NULL
 
       # Train the model
       if(tune_nodesize){
@@ -248,15 +251,6 @@ thief_rfsrc = function(y,
 
       # Generate forecasted ewmas for prediction
       cat('\nForecasting from the rfsrc\n')
-      ewma_fcs <- matrix(NA, nrow = frequency * k, ncol = ncol(ewmas))
-      for(w in 1:ncol(ewmas)){
-        # Add Gaussian noise to forecasted moving averages for better generalizability
-        ewma_fcs[,w] <- suppressWarnings(jitter(forecast::snaive(ts(ewmas[,w],
-                                                     frequency = frequency),
-                                                  h = frequency * k)$mean, amount = 0.25))
-      }
-      newdata <- data.frame(ewma_fcs)
-      colnames(newdata) <- colnames(rf_data)[-c(1:NCOL(y))]
 
       if(predict_quantiles){
         rf_quantiles <- randomForestSRC::quantreg(as.formula(paste0('cbind(',
@@ -267,12 +261,52 @@ thief_rfsrc = function(y,
                                                   nsplit = NULL,
                                                   nodesize = opt_nodesize,
                                                   method = 'local')
+
+        # Use mean of two separate iterations of jittered forecasted ewmas for better generalizability
+        ewma_fcs <- matrix(NA, nrow = frequency * k, ncol = ncol(ewmas))
+        for(w in 1:ncol(ewmas)){
+          # Add Gaussian noise to forecasted moving averages
+          ewma_fcs[,w] <- suppressWarnings(jitter(forecast::forecast(ts(ewmas[,w],
+                                                                        frequency = frequency),
+                                                                     h = frequency * k)$mean, amount = 0.05))
+        }
+        newdata <- data.frame(ewma_fcs)
+        colnames(newdata) <- colnames(rf_data)[-c(1:(NCOL(y)))]
         preds_quantiles <- randomForestSRC::quantreg(object = rf_quantiles , newdata = newdata)
         preds_quantiles <- purrr::map(preds_quantiles$quantreg, 'quantiles')
-        rm(rf_quantiles)
+
+        ewma_fcs <- matrix(NA, nrow = frequency * k, ncol = ncol(ewmas))
+        for(w in 1:ncol(ewmas)){
+          # Add Gaussian noise to forecasted moving averages
+          ewma_fcs[,w] <- suppressWarnings(jitter(forecast::forecast(ts(ewmas[,w],
+                                                                        frequency = frequency),
+                                                                     h = frequency * k)$mean, amount = 0.05))
+        }
+        newdata <- data.frame(ewma_fcs)
+        colnames(newdata) <- colnames(rf_data)[-c(1:(NCOL(y)))]
+
+        preds_quantiles2 <- randomForestSRC::quantreg(object = rf_quantiles , newdata = newdata)
+        preds_quantiles2 <- purrr::map(preds_quantiles2$quantreg, 'quantiles')
+
+        # Take mean from the two separate sets of quantile predictions
+        all_quantiles <- list(preds_quantiles, preds_quantiles2)
+        preds_quantiles <- lapply(seq_along(preds_quantiles), function(x){
+          Reduce(`+`, lapply(all_quantiles, "[[", x)) / length(all_quantiles)
+        })
+        rm(rf_quantiles, preds_quantiles2)
 
       } else {
         # Prediction using the mean forest
+        ewma_fcs <- matrix(NA, nrow = frequency * k, ncol = ncol(ewmas))
+        for(w in 1:ncol(ewmas)){
+          # Add Gaussian noise to forecasted moving averages for better generalizability
+          ewma_fcs[,w] <- suppressWarnings(jitter(forecast::forecast(ts(ewmas[,w],
+                                                                        frequency = frequency),
+                                                                     h = frequency * k)$mean, amount = 0.025))
+        }
+        newdata <- data.frame(ewma_fcs)
+        colnames(newdata) <- colnames(rf_data)[-c(1:(NCOL(y)))]
+
         preds_tree <- lapply(1:1000, function(p){
           preds <- randomForestSRC::predict.rfsrc(rf, get.tree = p + 1000, newdata = newdata)
           do.call(cbind, purrr::map(preds$regrOutput, 'predicted'))
@@ -293,7 +327,7 @@ thief_rfsrc = function(y,
 
           # Smooth the uncertainy intervals
           forecast <- do.call(cbind, lapply(seq_len(ncol(forecast)), function(x){
-            as.vector(forecast::tsclean(zoo::rollmedian(forecast[,x], k = max(3, floor(horizon / 10)), fill = NA)))
+            as.vector(forecast::na.interp(zoo::rollmedian(forecast[,x], k = max(3, floor(horizon / 10)), fill = NA)))
           }))
 
           # Estimate the distribution at each horizon by assuming it is gaussian and erring on the side
@@ -303,10 +337,9 @@ thief_rfsrc = function(y,
           }
 
           prediction <- do.call(rbind, lapply(seq_len(nrow(forecast)), function(x){
-            dist_sd <- max(unlist(lapply(seq(1:99), function(y){
+            dist_sd <- quantile(unlist(lapply(seq(1:99), function(y){
               ifelse(y!=50, get_sd(series_quantiles[x, 50], y / 100, series_quantiles[x,y]), NA)
-            })), na.rm = T)
-            # fit <- density(series_quantiles[x,], weights = weights / (sum(weights)))
+            })), na.rm = T, probs = 0.975)
             rnorm(1000, series_quantiles[x,50], dist_sd)
           }))
 
@@ -529,9 +562,8 @@ thief_rfsrc = function(y,
     if(discrete){
       # Back-transform the predictions to the estimated discrete distribution
       fcast_vec <- as.vector(new_distribution)
-      predictions <- back_trans(fcast_vec,
-                                copula_details[[series]]$dist_mappings,
-                                copula_details[[series]]$dist_params)
+      predictions <- back_trans(x = fcast_vec,
+                                params = copula_details[[series]]$dist_params)
       out <- matrix(data = predictions, ncol = ncol(new_distribution), nrow = nrow(new_distribution))
     } else {
       out <- new_distribution

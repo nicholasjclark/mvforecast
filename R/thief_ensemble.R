@@ -116,27 +116,13 @@ thief_ensemble = function(y,
     # Transform to approximate Gaussian if discrete = TRUE
     if(discrete){
       # Convert y to PIT-approximate Gaussian following censoring and NA interpolation
-      copula_y <- copula_params(series, non_neg = T, censor = 0.99)
-
-      # Estimate copula parameters from most recent values of y so the
-      # returned discrete distribution is more reflective of recent history
-      dist_params <- copula_params(tail(series, min(length(series), 100)),
-                                   non_neg = T, censor = 0.99)$params
+      copula_y <- copula_params(series)
 
       # The transformed y (approximately Gaussian following PIT transformation)
       series <- copula_y$y_trans
 
-      # Take random draws from the estimated discrete distribution so predictions can be mapped
-      # back to the original data distribution
-      if(length(dist_params) == 2){
-        dist_mappings <- stats::rnbinom(5000, size = dist_params[1],
-                                        mu = dist_params[2])
-      } else {
-        dist_mappings <- stats::rpois(5000, lambda = dist_params)
-      }
       copula_details[[i]] <- list(copula_y = copula_y,
-                                  dist_params = dist_params,
-                                  dist_mappings = dist_mappings)
+                                  dist_params = copula_y$params)
     }
 
     series_agg <- thief::tsaggregates(series)
@@ -329,12 +315,14 @@ thief_ensemble = function(y,
     if(discrete){
       # Back-transform the predictions to the estimated discrete distribution
       fcast_vec <- as.vector(new_distribution)
-      predictions <- back_trans(fcast_vec,
-                                copula_details[[series]]$dist_mappings,
-                                copula_details[[series]]$dist_params)
+      predictions <- back_trans(x = fcast_vec,
+                                params = copula_details[[series]]$dist_params)
       out <- matrix(data = predictions, ncol = ncol(new_distribution), nrow = nrow(new_distribution))
     } else {
       out <- new_distribution
+    }
+    if(any(is.infinite(out))){
+      out[is.infinite(out)] <- max(out, na.rm = T)
     }
     out
 
