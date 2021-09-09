@@ -7,22 +7,15 @@ onto a Gaussian distribution for modelling. This is essentially a copula method 
 is a discrete distribution. This function takes an approximately Gaussian forecast object
 and back-transforms it to the discrete distribution that was originally estimated.}
 \usage{
-transform_fc_preds(forecast, orig_y, dist_mappings, params, params_sd = 0)
+transform_fc_preds(forecast, orig_y, params)
 }
 \arguments{
 \item{forecast}{\code{forecast} object containing the approximately Gaussian predictions to be back-transformed}
 
 \item{orig_y}{\code{vector} containing the original untransformed y values}
 
-\item{dist_mappings}{\code{vector} containing random draws from the original discrete distribution. This set of draws is used for
-estimating rankings of \code{x} and so it should be large enough (\code{N >= 1000}) to represent the full discrete distribution.
-If missing, the \code{params_sd} estimates will be used to generate random draws from the discrete distribution to
-capture uncertainty}
-
 \item{params}{the original estimated discrete distribution parameter(s). If the original was Negative Binomially distributed,
 \code{params} will be a \code{list} of \code{length} \code{2}.}
-
-\item{params_sd}{the estimated standard deviation(s) of \code{params}}
 }
 \value{
 A \code{forecast} containing the estimated discrete predictions

@@ -7,7 +7,7 @@ onto a Gaussian distribution for modelling. This is essentially a copula method 
 is a discrete distribution. This function determines whether a Poisson or Negative Binomial is more appropriate for the series
 and then generates the approximately Gaussian PIT-transformed values of the series.}
 \usage{
-copula_params(y, non_neg = TRUE, censor = 0.99, k = 2)
+copula_params(y, non_neg = TRUE, censor = 1, k = 1)
 }
 \arguments{
 \item{y}{\code{ts} object containing the discrete time series. \code{NA}s are allowed and will be interpolated using a combination of
