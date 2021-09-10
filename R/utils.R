@@ -68,7 +68,7 @@ copula_params = function(y, non_neg = TRUE, censor = 1, k = 1){
 
   # Use smooth interpolation of any NAs, rather than solely using forecast::na.interp (which fills NAs
   # based on STL decompositions and could be wildly inaccurate in some cases)
-  y_discrete <- forecast::na.interp(zoo::rollmean(zoo::na.approx(y, na.rm = F), k = k, fill = NA))
+  y_discrete <- forecast::na.interp(zoo::rollmean(zoo::na.approx(as.vector(y), na.rm = F), k = k, fill = NA))
   y_discrete <- round(as.vector(y_discrete), 0)
 
   if(non_neg){
