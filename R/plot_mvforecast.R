@@ -6,7 +6,10 @@
 #'similar to those returned by \code{\link{thief_vets}}
 #'@param main \code{character}. Optional label for the plot
 #'@param ylab \code{character}. Optional label for the y axis
+#'@param xlab \code{character}. Optional label for the x axis
+#'@param plot_xaxis \code{logical}. Should the x-axis be plotted? Defaults to \code{TRUE}
 #'@param ylim Limits for the y-axis. Default is \code{c(min(simulation, na.rm = T), max(simulation, na.rm = T))}
+#'@param non_negative \code{logical}. If \code{TRUE}, intervals will be restricted to be non-negative
 #'
 #'@details The forecast distribution is used to calculate highest posterior density credible estimates for the following
 #'intervals: \code{c(0.95, 0.9, 0.85, 0.8, 0.75, 0.7)}
@@ -15,7 +18,9 @@
 #'
 #'@export
 plot_mvforecast = function(simulation, main = '', ylab = 'Y',
-                         ylim = NULL){
+                         ylim = NULL, non_negative = FALSE,
+                         xlab = 'Horizon',
+                         plot_xaxis = TRUE){
 
   # Calculate prediction intervals
   forecast <- do.call(rbind, lapply(seq_len(nrow(simulation)), function(x){
@@ -32,6 +37,10 @@ plot_mvforecast = function(simulation, main = '', ylab = 'Y',
                    seventies[3], seventyfives[3], eighties[3], eightyfives[3], nineties[3], ninetyfives[3])
     quantiles
   }))
+
+  if(non_negative){
+    forecast[forecast<0] <- 0
+  }
 
   if(missing(ylim)){
     ylim = c(min(forecast, na.rm = T), max(forecast, na.rm = T) + 5)
@@ -54,14 +63,18 @@ plot_mvforecast = function(simulation, main = '', ylab = 'Y',
     y_break_length <- 4
   }
 
-  plot(as.vector(simulation[,1]), xlab = 'Horizon', main = main,
+  par(mgp = c(2.5, 1, 0),
+      mai = c(0.8, 0.8, 0.4, 0.4))
+  plot(as.vector(simulation[,1]), xlab = xlab, main = main,
        ylab = ylab,
        ylim = ylim, type = 'n',
        xaxt='n',yaxt='n', axes = FALSE)
   rect(par("usr")[1],par("usr")[3],par("usr")[2],par("usr")[4],col = rgb(0.98, 0.98, 0.98, 1),
        border = NA)
-  axis(side = 2, at = round(seq(0, ylim[2], length.out = y_break_length), 1))
-  axis(side = 1, at = seq(0, nrow(forecast) + x_break_length, by = x_break_length))
+  axis(side = 2, at = round(seq(ylim[1], ylim[2], length.out = y_break_length), 1))
+  if(plot_xaxis){
+    axis(side = 1, at = seq(0, nrow(forecast) + x_break_length, by = x_break_length))
+  }
 
 
   # Add mean and 95% HPD intervals as lines

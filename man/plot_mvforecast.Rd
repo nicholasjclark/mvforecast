@@ -4,7 +4,15 @@
 \alias{plot_mvforecast}
 \title{Plot simulation predictions}
 \usage{
-plot_mvforecast(simulation, main = "", ylab = "Y", ylim = NULL)
+plot_mvforecast(
+  simulation,
+  main = "",
+  ylab = "Y",
+  ylim = NULL,
+  non_negative = FALSE,
+  xlab = "Horizon",
+  plot_xaxis = TRUE
+)
 }
 \arguments{
 \item{simulation}{\code{matrix}. The forecast object, which should be a horizon x simulation \code{matrix}
@@ -15,6 +23,12 @@ similar to those returned by \code{\link{thief_vets}}}
 \item{ylab}{\code{character}. Optional label for the y axis}
 
 \item{ylim}{Limits for the y-axis. Default is \code{c(min(simulation, na.rm = T), max(simulation, na.rm = T))}}
+
+\item{non_negative}{\code{logical}. If \code{TRUE}, intervals will be restricted to be non-negative}
+
+\item{xlab}{\code{character}. Optional label for the x axis}
+
+\item{plot_xaxis}{\code{logical}. Should the x-axis be plotted? Defaults to \code{TRUE}}
 }
 \value{
 A base plot of the forecast medeian (red dashed line) and credible intervals as a gradient polygon

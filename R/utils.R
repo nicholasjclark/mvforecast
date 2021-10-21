@@ -37,7 +37,7 @@ poiss_params = function(x){
 #'@export
 #'
 paranorm = function(x){
-  ranks <- data.table::frank(log2(x + 0.01), ties.method = 'max')
+  ranks <- data.table::frank(log2(x + 0.01))
   pit_vals <- stats::qnorm(ranks / (length(x) + 1), sd = 2)
   return(pit_vals)
 }
@@ -121,7 +121,7 @@ back_trans = function(x, params){
   # Map forecast onto a logistic curve to respect the multiplicative nature of
   # quantile changes
   soft_boundary = function(x){
-    x * pnorm(10/abs(x), sd = 2)
+    x * pnorm(8/abs(x), sd = 2)
   }
 
   probs <- pnorm(as.vector(soft_boundary(x)), sd = 2)
