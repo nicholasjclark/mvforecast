@@ -1,0 +1,20 @@
+#' NEON Ixodes tick abundance surveys (uninterpolated) used in the 2021 EFI forecasting challenge
+#'
+#' A dataset containing interpolated timeseries of Ixodes scapularis nymph abundances at NEON sites. All plot
+#' series were truncated so that their start dates were identical. They were then split into training and testing sets. The same was then done for regressors
+#'
+#' @format A list containing
+#' \describe{
+#'   \item{plot_IDs}{NEON plot IDs for survey locations}
+#'   \item{last_train}{Last index of the training period; set to 130}
+#'   \item{h}{Length of the out-of-sample test period for cross-validation}
+#'   \item{y_train}{xts matrix containing the uninterpolated in-sample observations}
+#'   \item{xreg_train}{xts matrix containing the interpolated in-sample covariate timeseries}
+#'   \item{y_test}{xts matrix containing the interpolated out-of-sample observations}
+#'   \item{xreg_test}{xts matrix containing the inpterolated out-of-sample covariate timeseries}
+#'   \item{xreg_include}{matrix specifying the vets xreg structure}
+#'   \item{future_xreg}{xts matrix containing the forecast future values for covariates (beyond the test period)}
+#'   \item{groups}{vector of integers specifying the vets grouping structure, grouped based on shared sites}
+#' }
+#' @source \url{https://www.neonscience.org/data}
+"ixodes_vets_dat_raw"

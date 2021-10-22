@@ -13,8 +13,12 @@ Suggests: testthat,
     knitr, 
     rmarkdown
 VignetteBuilder: knitr
-Depends: R (>= 4.0.0), forecast
+Depends: R (>= 4.0.0), forecast, rjags
 Imports: parallel,
+    coda,
+    MCMCpack,
+    runjags,
+    MCMCvis,
     tsmethods,
     tsaux,
     tsets,
