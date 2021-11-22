@@ -116,11 +116,11 @@ jags_mod <- jags.model(textConnection(model_file),
                       data = jags_data,
                       inits = inits,
                       n.chains = n.chains,
-                      n.adapt = n.adapt)
+                      n.adapt = 0)
 
 
 # Update the model for the burnin period
-update(jags_mod, n.burnin)
+adapt(jags_mod, n.burnin, end.adaptation = TRUE)
 
 # Sample from the posterior
 out_jags_mod <- rjags::coda.samples(jags_mod,

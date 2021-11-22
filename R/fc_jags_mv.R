@@ -12,8 +12,7 @@
 #'@param use_nb \code{logical} If \code{TRUR}, use a Negative Binomial likelihood with estimated
 #'overdispersion parameter r;
 #'@param n.chains \code{integer} the number of parallel chains for the model
-#'@param n.adapt \code{integer} the number of iterations for adaptation. See adapt for details.
-#'If \code{n.adapt} = 0 then no adaptation takes place
+#'@param n.burnin \code{integer} the number of iterations for adaptation/burnin.
 #'@param n.iter \code{integer} the number of iterations of the Markov chain to run
 #'@param auto_update \code{logical} If \code{TRUE}, the model is run for up to \code{3} additional sets of
 #'\code{n.iter} iterations, or until the lower 15th percentile of effective sample sizes reaches \code{200}
@@ -34,7 +33,6 @@ fc_jags_mv = function(y,
                        frequency,
                        use_nb = TRUE,
                        n.chains = 2,
-                       n.adapt = 1000,
                        n.burnin = 10000,
                        n.iter = 10000,
                        thin = 10,
@@ -171,11 +169,11 @@ jags_mod <- jags.model(textConnection(model_file),
                       data = jags_data,
                       inits = inits,
                       n.chains = n.chains,
-                      n.adapt = n.adapt)
+                      n.adapt = 0)
 
 
 # Update the model for the burnin period
-update(jags_mod, n.burnin)
+adapt(jags_mod, n.burnin, end.adaptation = TRUE)
 
 # Sample from the posterior
 out_jags_mod <- rjags::coda.samples(jags_mod,
