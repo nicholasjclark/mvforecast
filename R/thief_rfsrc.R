@@ -497,7 +497,7 @@ thief_rfsrc = function(y,
       ts(series_base[[x]]$mean, frequency = frequencies[x])
     })
     series_resids <- lapply(seq_along(outcomes), function(x){
-      orig_resids <- residuals[[x]]
+      orig_resids <- as.vector(residuals[[x]][[series]])
       orig_resids[is.infinite(orig_resids)] <- NA
       orig_resids <- as.vector(forecast::tsclean(orig_resids))
       orig_resids[is.infinite(orig_resids)] <- NA
